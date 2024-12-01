@@ -33,7 +33,7 @@ jobs:
           echo "collection_timestamp,clone_timestamp,total_clones,unique_clones" > clones_history.csv
         fi
         
-        # Parse the JSON and append to CSV
+        # Parse the JSON and append only new entries to CSV
         jq -r --arg timestamp "$timestamp" '
           .clones | 
           map([
@@ -45,12 +45,23 @@ jobs:
             .count, 
             .uniques
           ] | @csv)[] 
-        ' clones_data.json >> clones_history.csv
+        ' clones_data.json | while IFS=, read -r _ clone_date total_clones unique_clones; do
+          # Check if this exact entry already exists in the CSV
+          if ! grep -q "$clone_date,$total_clones,$unique_clones" clones_history.csv; then
+            echo "$timestamp,$clone_date,$total_clones,$unique_clones" >> clones_history.csv
+          fi
+        done
     
     - name: Commit and push clone data
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
-        git add clones_history.csv
-        git commit -m "Update clone statistics" || exit 0
-        git push
+        
+        # Check if there are any changes to commit
+        if [[ -n $(git status -s) ]]; then
+          git add clones_history.csv
+          git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d")"
+          git push
+        else
+          echo "No new clone data to update"
+        fi
