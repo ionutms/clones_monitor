@@ -57,9 +57,11 @@ jobs:
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
+        # Add all changes, including untracked files
+        git add .
+        
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
-          git add clones_history.csv
           git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d")"
           git push
         else
