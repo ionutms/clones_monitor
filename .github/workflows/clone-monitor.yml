@@ -13,8 +13,6 @@ jobs:
     steps:
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch all history for all branches and tags
       
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
@@ -35,25 +33,21 @@ jobs:
           echo "collection_timestamp,clone_timestamp,total_clones,unique_clones" > clones_history.csv
         fi
         
-        # Parse the JSON and append to CSV with consistent timestamp format
+        # Parse the JSON and append to CSV
         jq -r --arg timestamp "$timestamp" '
-          .clones[] | [
+          .clones | 
+          map([
             $timestamp, 
-            (.timestamp | split("T")[0] | split("-") | join("/") + "/" + (.timestamp | split("T")[1] | split(":")[0,1] | join("/") + "/00"), 
+            .timestamp, 
             .count, 
             .uniques
-          ] | @csv
+          ] | @csv)[] 
         ' clones_data.json >> clones_history.csv
     
     - name: Commit and push clone data
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
-        
-        # Pull latest changes first
-        git pull origin main --rebase
-        
-        # Stage, commit, and push changes
         git add clones_history.csv
         git commit -m "Update clone statistics" || exit 0
-        git push origin main
+        git push
