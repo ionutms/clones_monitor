@@ -38,7 +38,11 @@ jobs:
           .clones | 
           map([
             $timestamp, 
-            (.timestamp | split("T")[0] | replace("-", "/") + "/" + (.timestamp | split("T")[1] | split(":")[0,1,2] | join("/"))), 
+            (.timestamp | 
+              gsub("-"; "/") | 
+              split("T") | 
+              [ .[0], .[1] | split(":")[0:3] | join("/") ] | 
+              join("/")),
             .count, 
             .uniques
           ] | @csv)[] 
