@@ -26,16 +26,13 @@ jobs:
         # Fetch current timestamp in year/month/day format when zeroes
         timestamp=$(date -u +"%Y/%m/%d")
         
-        # Fetch clones for the public repository
-        gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones \
-          > clones_data.json
-        
         # Ensure CSV exists with header if it doesn't
         if [ ! -f clones_history.csv ]; then
           echo "collection_timestamp,clone_timestamp,total_clones,unique_clones" > clones_history.csv
         fi
         
-        # Parse the JSON and append only new entries to CSV
+        # Fetch clones for the public repository and directly parse to CSV
+        gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones | \
         jq -r --arg timestamp "$timestamp" '
           .clones | 
           map([
@@ -47,7 +44,7 @@ jobs:
             .count, 
             .uniques
           ] | @csv)[] 
-        ' clones_data.json | while IFS=, read -r _ clone_date total_clones unique_clones; do
+        ' | while IFS=, read -r _ clone_date total_clones unique_clones; do
           # Check if this exact entry already exists in the CSV
           if ! grep -q "$clone_date,$total_clones,$unique_clones" clones_history.csv; then
             echo "$timestamp,$clone_date,$total_clones,$unique_clones" >> clones_history.csv
@@ -59,21 +56,13 @@ jobs:
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Stash any existing changes
-        git stash
-        
-        # Pull the latest changes
-        git pull origin main
-        
-        # Pop the stash (which will add our new files)
-        git stash pop || true
-        
-        # Stage all changes
-        git add .
+        # Stage only the CSV file
+        git add clones_history.csv
         
         # Check if there are any changes to commit
-        if [[ -n $(git diff --staged) ]]; then
+        if [[ -n $(git status -s) ]]; then
           git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d")"
+          git pull --rebase origin main
           git push origin main
         else
           echo "No new clone data to update"
