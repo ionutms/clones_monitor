@@ -2,8 +2,8 @@ name: Monitor Repository Clones
 
 on:
   schedule:
-    # Run every hour
-    - cron: '0 * * * *'
+    # Run once daily at midnight UTC
+    - cron: '0 0 * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -21,8 +21,8 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
       run: |
-        # Fetch current timestamp in year/month/day/hour/minute/second format
-        timestamp=$(date -u +"%Y/%m/%d/%H/%M/%S")
+        # Fetch current timestamp in year/month/day format when zeroes
+        timestamp=$(date -u +"%Y/%m/%d")
         
         # Fetch clones for the public repository
         gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones \
@@ -40,9 +40,8 @@ jobs:
             $timestamp, 
             (.timestamp | 
               gsub("-"; "/") | 
-              split("T") | 
-              [ .[0], .[1] | split(":")[0:3] | join("/") ] | 
-              join("/")),
+              gsub("Z$"; "") | 
+              split("T")[0]),
             .count, 
             .uniques
           ] | @csv)[] 
