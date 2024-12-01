@@ -14,8 +14,8 @@ jobs:
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
       
-    - name: Set up GitHub CLI
-      uses: actions/setup-github-cli@v1
+    - name: Setup GitHub CLI
+      uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
       
     - name: Fetch clone statistics
       env:
