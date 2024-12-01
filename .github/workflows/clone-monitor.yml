@@ -1,0 +1,47 @@
+name: Monitor Repository Clones
+
+on:
+  schedule:
+    # Run daily at midnight UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  monitor-clones:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout clones_monitor repository
+      uses: actions/checkout@v4
+      
+    - name: Set up GitHub CLI
+      uses: actions/setup-github-cli@v1
+      
+    - name: Fetch clone statistics
+      env:
+        GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
+      run: |
+        # Fetch clones for the public repository
+        gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones \
+          > clones_data.json
+        
+        # Add timestamp to the clone data
+        echo "{ \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"," > clones_report.json
+        cat clones_data.json >> clones_report.json
+        echo "}" >> clones_report.json
+        
+        # Append to historical clone data
+        if [ -f clones_history.json ]; then
+          jq -s '.[0] + [.[1]]' clones_history.json clones_report.json > temp.json
+          mv temp.json clones_history.json
+        else
+          mv clones_report.json clones_history.json
+        fi
+    
+    - name: Commit and push clone data
+      run: |
+        git config user.name 'GitHub Actions Bot'
+        git config user.email '<>'
+        git add clones_history.json
+        git commit -m "Update clone statistics" || exit 0
+        git push
