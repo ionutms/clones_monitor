@@ -33,12 +33,12 @@ jobs:
           echo "collection_timestamp,clone_timestamp,total_clones,unique_clones" > clones_history.csv
         fi
         
-        # Parse the JSON and append to CSV
+        # Parse the JSON and append to CSV with consistent timestamp format
         jq -r --arg timestamp "$timestamp" '
           .clones | 
           map([
             $timestamp, 
-            .timestamp, 
+            (.timestamp | split("T")[0] | split("-") | join("/") + "/" + (.timestamp | split("T")[1] | split(":")[0,1] | join("/") + "/00"), 
             .count, 
             .uniques
           ] | @csv)[] 
