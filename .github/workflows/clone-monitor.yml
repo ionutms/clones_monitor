@@ -21,8 +21,8 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
       run: |
-        # Fetch current timestamp with nanosecond precision
-        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%N%z")
+        # Fetch current timestamp in year/month/day/hour/minute/second format
+        timestamp=$(date -u +"%Y/%m/%d/%H/%M/%S")
         
         # Fetch clones for the public repository
         gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones \
@@ -38,7 +38,7 @@ jobs:
           .clones | 
           map([
             $timestamp, 
-            .timestamp, 
+            (.timestamp | split("T")[0] | replace("-", "/") + "/" + (.timestamp | split("T")[1] | split(":")[0,1,2] | join("/"))), 
             .count, 
             .uniques
           ] | @csv)[] 
