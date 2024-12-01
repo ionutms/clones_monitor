@@ -59,15 +59,20 @@ jobs:
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Add all changes, including untracked files
+        # Stash any existing changes
+        git stash
+        
+        # Pull the latest changes
+        git pull origin main
+        
+        # Pop the stash (which will add our new files)
+        git stash pop || true
+        
+        # Stage all changes
         git add .
         
         # Check if there are any changes to commit
-        if [[ -n $(git status -s) ]]; then
-          # Pull the latest changes to merge with remote
-          git pull --rebase origin main
-          
-          # Commit and push changes
+        if [[ -n $(git diff --staged) ]]; then
           git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d")"
           git push origin main
         else
