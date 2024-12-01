@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for all branches and tags
       
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
@@ -62,8 +64,12 @@ jobs:
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
+          # Pull the latest changes to merge with remote
+          git pull --rebase origin main
+          
+          # Commit and push changes
           git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d")"
-          git push
+          git push origin main
         else
           echo "No new clone data to update"
         fi
