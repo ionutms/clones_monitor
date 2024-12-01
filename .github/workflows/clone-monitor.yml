@@ -25,23 +25,31 @@ jobs:
         gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones \
           > clones_data.json
         
-        # Add timestamp to the clone data
-        echo "{ \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"," > clones_report.json
-        cat clones_data.json >> clones_report.json
-        echo "}" >> clones_report.json
+        # Use jq to convert JSON to CSV
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         
-        # Append to historical clone data
-        if [ -f clones_history.json ]; then
-          jq -s '.[0] + [.[1]]' clones_history.json clones_report.json > temp.json
-          mv temp.json clones_history.json
-        else
-          mv clones_report.json clones_history.json
+        # Parse the JSON and convert to CSV
+        jq -r --arg timestamp "$timestamp" '
+          .clones | 
+          map([
+            $timestamp, 
+            .timestamp, 
+            .count, 
+            .uniques
+          ] | @csv)[] 
+        ' clones_data.json > clones_history.csv
+        
+        # If this is the first run and no header exists, add one
+        if [ ! -f clones_history_header.csv ]; then
+          echo "collection_timestamp,clone_timestamp,total_clones,unique_clones" > clones_history_header.csv
+          cat clones_history_header.csv clones_history.csv > temp.csv
+          mv temp.csv clones_history.csv
         fi
     
     - name: Commit and push clone data
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
-        git add clones_history.json
+        git add clones_history.csv
         git commit -m "Update clone statistics" || exit 0
         git push
