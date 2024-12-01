@@ -2,8 +2,8 @@ name: Monitor Repository Clones
 
 on:
   schedule:
-    # Run once daily at midnight UTC
-    - cron: '0 0 * * *'
+    # Run every hour
+    - cron: '0 * * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -13,9 +13,7 @@ jobs:
     steps:
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch all history to allow pulling changes
-    
+      
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
       
@@ -23,8 +21,8 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
       run: |
-        # Fetch current timestamp in year/month/day format when zeroes
-        timestamp=$(date -u +"%Y/%m/%d")
+        # Fetch current timestamp in year/month/day/hour/minute/second format
+        timestamp=$(date -u +"%Y/%m/%d/%H/%M/%S")
         
         # Fetch clones for the public repository
         gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones \
@@ -42,8 +40,9 @@ jobs:
             $timestamp, 
             (.timestamp | 
               gsub("-"; "/") | 
-              gsub("Z$"; "") | 
-              split("T")[0]),
+              split("T") | 
+              [ .[0], .[1] | split(":")[0:3] | join("/") ] | 
+              join("/")),
             .count, 
             .uniques
           ] | @csv)[] 
@@ -53,7 +52,6 @@ jobs:
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
-        git pull --rebase  # Pull changes and rebase local commits
         git add clones_history.csv
         git commit -m "Update clone statistics" || exit 0
         git push
