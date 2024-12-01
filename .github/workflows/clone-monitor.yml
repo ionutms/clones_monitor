@@ -61,7 +61,7 @@ jobs:
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
-          git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d")"
+          git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
           git pull --rebase origin main
           git push origin main
         else
