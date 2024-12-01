@@ -13,7 +13,9 @@ jobs:
     steps:
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
-      
+      with:
+        fetch-depth: 0  # Fetch all history to allow pulling changes
+    
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
       
@@ -51,6 +53,7 @@ jobs:
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
+        git pull --rebase  # Pull changes and rebase local commits
         git add clones_history.csv
         git commit -m "Update clone statistics" || exit 0
         git push
