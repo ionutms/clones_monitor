@@ -40,6 +40,7 @@ jobs:
             $timestamp, 
             (.timestamp | 
               gsub("-"; "/") | 
+              gsub("Z$"; "") | 
               split("T") | 
               [ .[0], .[1] | split(":")[0:3] | join("/") ] | 
               join("/")),
