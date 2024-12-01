@@ -2,8 +2,8 @@ name: Monitor Repository Clones
 
 on:
   schedule:
-    # Run every hour
-    - cron: '0 * * * *'
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
