@@ -37,13 +37,12 @@ jobs:
         
         # Parse the JSON and append to CSV with consistent timestamp format
         jq -r --arg timestamp "$timestamp" '
-          .clones | 
-          map([
+          .clones[] | [
             $timestamp, 
             (.timestamp | split("T")[0] | split("-") | join("/") + "/" + (.timestamp | split("T")[1] | split(":")[0,1] | join("/") + "/00"), 
             .count, 
             .uniques
-          ] | @csv)[] 
+          ] | @csv
         ' clones_data.json >> clones_history.csv
     
     - name: Commit and push clone data
