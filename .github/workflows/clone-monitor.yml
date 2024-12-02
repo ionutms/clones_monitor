@@ -36,10 +36,7 @@ jobs:
         jq -r --arg timestamp "$timestamp" '
           .clones | 
           map([
-            (.timestamp | 
-              gsub("-"; "/") | 
-              gsub("Z$"; "") | 
-              split("T")[0]),
+            $timestamp,  # Use the current timestamp instead of the API timestamp
             .count, 
             .uniques
           ] | @csv)[] 
