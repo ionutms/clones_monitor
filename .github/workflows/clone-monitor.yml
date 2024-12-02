@@ -23,9 +23,6 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
       run: |
-        # Fetch current timestamp in year/month/day format
-        timestamp=$(date -u +"%Y/%m/%d")
-        
         # Ensure CSV exists with header if it doesn't
         if [ ! -f clones_history.csv ]; then
           echo "clone_timestamp,total_clones,unique_clones" > clones_history.csv
@@ -34,10 +31,10 @@ jobs:
         # Fetch clones for the main branch of one public repository and append to CSV
         repo="ionutms/KiCAD_Symbols_Generator"
         gh api "repos/$repo/traffic/clones?per_page=100&ref=main" | \
-        jq -r --arg timestamp "$timestamp" '
+        jq -r '
           .clones |
           map([
-            $timestamp,
+            .timestamp,
             .count,
             .uniques
           ] | @csv)[]
