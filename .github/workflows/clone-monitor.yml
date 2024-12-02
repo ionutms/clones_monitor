@@ -23,7 +23,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
       run: |
-        # Fetch current timestamp in year/month/day format when zeroes
+        # Fetch current timestamp in year/month/day format
         timestamp=$(date -u +"%Y/%m/%d")
         
         # Ensure CSV exists with header if it doesn't
@@ -31,7 +31,7 @@ jobs:
           echo "clone_timestamp,total_clones,unique_clones" > clones_history.csv
         fi
         
-        # Fetch clones for the public repository and directly parse to CSV
+        # Fetch clones for the public repository and append to CSV
         gh api repos/ionutms/KiCAD_Symbols_Generator/traffic/clones | \
         jq -r --arg timestamp "$timestamp" '
           .clones | 
@@ -44,12 +44,7 @@ jobs:
             .count, 
             .uniques
           ] | @csv)[] 
-        ' | while IFS=, read -r _ clone_date total_clones unique_clones; do
-          # Check if this exact entry already exists in the CSV
-          if ! grep -q "$clone_date,$total_clones,$unique_clones" clones_history.csv; then
-            echo "$clone_date,$total_clones,$unique_clones" >> clones_history.csv
-          fi
-        done
+        ' >> clones_history.csv
     
     - name: Commit and push clone data
       run: |
