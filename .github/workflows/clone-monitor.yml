@@ -34,7 +34,7 @@ jobs:
         jq -r '
           .clones |
           map([
-            .timestamp,
+            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
             .count,
             .uniques
           ] | @csv)[]
