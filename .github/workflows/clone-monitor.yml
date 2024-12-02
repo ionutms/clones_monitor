@@ -36,7 +36,6 @@ jobs:
         jq -r --arg timestamp "$timestamp" '
           .clones | 
           map([
-            $timestamp, 
             (.timestamp | 
               gsub("-"; "/") | 
               gsub("Z$"; "") | 
