@@ -45,11 +45,20 @@ jobs:
     
     - name: Remove duplicate rows from CSV
       run: |
-        # Use awk to remove duplicate rows while preserving the header
         awk '
-          NR==1 {header=$0; print $0; next}
-          !seen[$0]++ 
-        ' clones_history.csv > clones_history_unique.csv
+          BEGIN { FS=OFS="," }
+          NR==1 { header=$0; print $0; next }
+          {
+            # Store the latest row for each unique timestamp
+            data[$1] = $0
+          }
+          END {
+            # Print the latest row for each unique timestamp
+            for (timestamp in data) {
+              print data[timestamp]
+            }
+          }
+        ' clones_history.csv | sort -t, -k1 > clones_history_unique.csv
         
         # Replace the original file with the deduplicated version
         mv clones_history_unique.csv clones_history.csv
