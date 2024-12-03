@@ -45,9 +45,13 @@ jobs:
     
     - name: Remove duplicate rows from CSV
       run: |
+        # Ensure header is correct and at the top
+        echo "clone_timestamp,total_clones,unique_clones" > clones_history_fixed.csv
+        
         awk '
           BEGIN { FS=OFS="," }
-          NR==1 { header=$0; print $0; next }
+          # Skip the original header if present
+          NR==1 && $1 == "clone_timestamp" { next }
           {
             # Store the latest row for each unique timestamp
             data[$1] = $0
@@ -58,10 +62,10 @@ jobs:
               print data[timestamp]
             }
           }
-        ' clones_history.csv | sort -t, -k1 > clones_history_unique.csv
+        ' clones_history.csv | sort -t, -k1 >> clones_history_fixed.csv
         
-        # Replace the original file with the deduplicated version
-        mv clones_history_unique.csv clones_history.csv
+        # Replace the original file with the corrected version
+        mv clones_history_fixed.csv clones_history.csv
     
     - name: Commit and push clone data
       run: |
