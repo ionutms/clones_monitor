@@ -1,4 +1,4 @@
-name: Monitor Repository Clones
+name: Monitor Repository Clones and Visitors
 
 on:
   schedule:
@@ -10,7 +10,7 @@ on:
       - main  # Trigger on pushes to the main branch
 
 jobs:
-  monitor-clones:
+  monitor-traffic:
     runs-on: ubuntu-latest
     
     steps:
@@ -22,17 +22,24 @@ jobs:
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
       
-    - name: Fetch clone statistics
+    - name: Fetch clone and visitor statistics
       env:
         GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
       run: |
-        # Ensure CSV exists with header if it doesn't
+        # Ensure clone CSV exists with header if it doesn't
         if [ ! -f clones_history.csv ]; then
           echo "clone_timestamp,total_clones,unique_clones" > clones_history.csv
         fi
         
-        # Fetch clones for the main branch of one public repository and append to CSV
+        # Ensure visitors CSV exists with header if it doesn't
+        if [ ! -f visitors_history.csv ]; then
+          echo "visitor_timestamp,total_visitors,unique_visitors" > visitors_history.csv
+        fi
+        
+        # Repository to monitor
         repo="ionutms/KiCAD_Symbols_Generator"
+        
+        # Fetch clones for the main branch and append to clone CSV
         gh api "repos/$repo/traffic/clones?per_page=100&ref=main" | \
         jq -r '
           .clones |
@@ -42,44 +49,61 @@ jobs:
             .uniques
           ] | @csv)[]
         ' >> clones_history.csv
-    
-    - name: Remove duplicate rows from CSV
-      run: |
-        # Ensure header is correct and at the top
-        echo "clone_timestamp,total_clones,unique_clones" > clones_history_fixed.csv
         
+        # Fetch visitors for the main branch and append to visitors CSV
+        gh api "repos/$repo/traffic/views?per_page=100&ref=main" | \
+        jq -r '
+          .views |
+          map([
+            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
+            .count,
+            .uniques
+          ] | @csv)[]
+        ' >> visitors_history.csv
+    
+    - name: Remove duplicate rows from CSVs
+      run: |
+        # Process clone CSV
+        echo "clone_timestamp,total_clones,unique_clones" > clones_history_fixed.csv
         awk '
           BEGIN { FS=OFS="," }
-          # Skip the original header if present
           NR==1 && $1 == "clone_timestamp" { next }
-          {
-            # Store the latest row for each unique timestamp
-            data[$1] = $0
-          }
+          { data[$1] = $0 }
           END {
-            # Print the latest row for each unique timestamp
             for (timestamp in data) {
               print data[timestamp]
             }
           }
         ' clones_history.csv | sort -t, -k1 >> clones_history_fixed.csv
-        
-        # Replace the original file with the corrected version
         mv clones_history_fixed.csv clones_history.csv
+        
+        # Process visitors CSV
+        echo "visitor_timestamp,total_visitors,unique_visitors" > visitors_history_fixed.csv
+        awk '
+          BEGIN { FS=OFS="," }
+          NR==1 && $1 == "visitor_timestamp" { next }
+          { data[$1] = $0 }
+          END {
+            for (timestamp in data) {
+              print data[timestamp]
+            }
+          }
+        ' visitors_history.csv | sort -t, -k1 >> visitors_history_fixed.csv
+        mv visitors_history_fixed.csv visitors_history.csv
     
-    - name: Commit and push clone data
+    - name: Commit and push traffic data
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Stage only the CSV file
-        git add clones_history.csv
+        # Stage both CSV files
+        git add clones_history.csv visitors_history.csv
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
-          git commit -m "Update clone statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
+          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
           git pull --rebase origin main
           git push origin main
         else
-          echo "No new clone data to update"
+          echo "No new traffic data to update"
         fi
