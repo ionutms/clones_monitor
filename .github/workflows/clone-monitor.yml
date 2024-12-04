@@ -1,4 +1,4 @@
-name: Monitor Repository Clones and Visitors
+name: Monitor Repository Clones and Update Traffic Data
 
 on:
   schedule:
@@ -24,7 +24,7 @@ jobs:
       
     - name: Fetch clone and visitor statistics
       env:
-        GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
+        GH_TOKEN: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
       run: |
         # Ensure clone CSV exists with header if it doesn't
         if [ ! -f clones_history.csv ]; then
@@ -91,7 +91,49 @@ jobs:
         ' visitors_history.csv | sort -t, -k1 >> visitors_history_fixed.csv
         mv visitors_history_fixed.csv visitors_history.csv
     
-    - name: Commit and push traffic data
+    - name: Commit and push traffic data to clones_monitor
+      run: |
+        git config user.name 'GitHub Actions Bot'
+        git config user.email '<>'
+        
+        # Stage both CSV files
+        git add clones_history.csv visitors_history.csv
+        
+        # Check if there are any changes to commit
+        if [[ -n $(git status -s) ]]; then
+          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
+          git pull --rebase origin main
+          git push origin main
+        else
+          echo "No new traffic data to update"
+        fi
+  
+  update-kicad-repo-traffic:
+    needs: monitor-traffic
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout clones_monitor repository
+      uses: actions/checkout@v4
+      with:
+        repository: ionutms/clones_monitor
+        path: clones_monitor
+    
+    - name: Checkout KiCAD Symbols Generator repository
+      uses: actions/checkout@v4
+      with:
+        repository: ionutms/KiCAD_Symbols_Generator
+        path: kicad-repo
+        token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
+    
+    - name: Copy CSV files
+      run: |
+        # Copy existing CSV files from clones_monitor to KiCAD repository
+        cp clones_monitor/clones_history.csv kicad-repo/clones_history.csv
+        cp clones_monitor/visitors_history.csv kicad-repo/visitors_history.csv
+    
+    - name: Commit and push traffic data to KiCAD repository
+      working-directory: kicad-repo
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
