@@ -17,26 +17,25 @@ jobs:
     - name: Checkout KiCAD Symbols Generator repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Fetch all history for all branches and tags
-      
+        path: kicad-repo
+    
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
       with:
         repository: ionutms/clones_monitor
         path: clones_monitor
     
-    - name: Setup GitHub CLI
-      uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
-    
     - name: Update Repository Traffic Data
-      env:
-        GH_TOKEN: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
       run: |
+        # Change to the KiCAD repository directory
+        cd kicad-repo
+        
         # Copy CSV files from clones_monitor repository
-        cp clones_monitor/clones_history.csv clones_history.csv
-        cp clones_monitor/visitors_history.csv visitors_history.csv
+        cp ../clones_monitor/clones_history.csv clones_history.csv
+        cp ../clones_monitor/visitors_history.csv visitors_history.csv
     
     - name: Commit and push traffic data
+      working-directory: kicad-repo
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
