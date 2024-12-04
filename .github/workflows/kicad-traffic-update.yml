@@ -5,35 +5,30 @@ on:
     # Run every 6 hours (at 00:00, 06:00, 12:00, and 18:00 UTC)
     - cron: '0 */6 * * *'
   workflow_dispatch:  # Allow manual triggering
-  push:
-    branches:
-      - main  # Trigger on pushes to the main branch
 
 jobs:
   update-traffic-data:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout clones_monitor repository
+      uses: actions/checkout@v4
+      with:
+        repository: ionutms/clones_monitor
+        path: clones_monitor
+    
     - name: Checkout KiCAD Symbols Generator repository
       uses: actions/checkout@v4
       with:
+        repository: ionutms/KiCAD_Symbols_Generator
         path: kicad-repo
+        token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
-    - name: Download CSV files from clones_monitor repository
-      env:
-        GH_TOKEN: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
+    - name: Copy CSV files
       run: |
-        # Fetch clones_history.csv
-        gh api \
-          -H "Accept: application/vnd.github.v3.raw" \
-          /repos/ionutms/clones_monitor/contents/clones_history.csv \
-          > kicad-repo/clones_history.csv
-        
-        # Fetch visitors_history.csv
-        gh api \
-          -H "Accept: application/vnd.github.v3.raw" \
-          /repos/ionutms/clones_monitor/contents/visitors_history.csv \
-          > kicad-repo/visitors_history.csv
+        # Copy existing CSV files from clones_monitor to KiCAD repository
+        cp clones_monitor/clones_history.csv kicad-repo/clones_history.csv
+        cp clones_monitor/visitors_history.csv kicad-repo/visitors_history.csv
     
     - name: Commit and push traffic data
       working-directory: kicad-repo
