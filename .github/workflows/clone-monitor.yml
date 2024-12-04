@@ -14,17 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout monitoring repository
+    - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Fetch all history for all branches and tags
-    
-    - name: Checkout KiCAD_Symbols_Generator repository
-      uses: actions/checkout@v4
-      with:
-        repository: ionutms/KiCAD_Symbols_Generator
-        path: kicat-repo
-    
+      
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
       
@@ -97,44 +91,19 @@ jobs:
         ' visitors_history.csv | sort -t, -k1 >> visitors_history_fixed.csv
         mv visitors_history_fixed.csv visitors_history.csv
     
-    - name: Commit and push traffic data to monitoring repository
-      env:
-        GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
+    - name: Commit and push traffic data
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Copy CSVs to KiCAD repo
-        cp clones_history.csv kicat-repo/clones_history.csv
-        cp visitors_history.csv kicat-repo/visitors_history.csv
-        
-        # Commit to monitoring repository
+        # Stage both CSV files
         git add clones_history.csv visitors_history.csv
         
+        # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
           git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
           git pull --rebase origin main
           git push origin main
         else
-          echo "No new traffic data to update in monitoring repository"
-        fi
-    
-    - name: Commit and push traffic data to KiCAD_Symbols_Generator repository
-      env:
-        GH_TOKEN: ${{ secrets.CLONE_MONITOR_TOKEN }}
-      run: |
-        cd kicat-repo
-        
-        git config user.name 'GitHub Actions Bot'
-        git config user.email '<>'
-        
-        # Stage CSV files
-        git add clones_history.csv visitors_history.csv
-        
-        if [[ -n $(git status -s) ]]; then
-          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
-          git pull --rebase origin main
-          git push origin main
-        else
-          echo "No new traffic data to update in KiCAD repository"
+          echo "No new traffic data to update"
         fi
