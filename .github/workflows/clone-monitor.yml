@@ -2,8 +2,7 @@ name: Monitor Repository Clones and Update Traffic Data
 
 on:
   schedule:
-    # Run every 6 hours (at 00:00, 06:00, 12:00, and 18:00 UTC)
-    - cron: '0 */6 * * *'
+    - cron: '0 13 * * *'
   workflow_dispatch:  # Allow manual triggering
   push:
     branches:
