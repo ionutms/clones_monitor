@@ -106,7 +106,7 @@ jobs:
         else
           echo "No new traffic data to update"
         fi
-  
+
   update-kicad-repo-traffic:
     needs: monitor-traffic
     runs-on: ubuntu-latest
@@ -117,6 +117,7 @@ jobs:
       with:
         repository: ionutms/clones_monitor
         path: clones_monitor
+        token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
     - name: Checkout KiCAD Symbols Generator repository
       uses: actions/checkout@v4
@@ -127,7 +128,7 @@ jobs:
     
     - name: Create repo_traffic_data directory and copy CSV files
       run: |
-        # Create repo_traffic_data directory in the KiCAD repository
+        # Ensure repo_traffic_data directory exists
         mkdir -p kicad-repo/repo_traffic_data
         
         # Copy existing CSV files from clones_monitor to repo_traffic_data
@@ -143,11 +144,7 @@ jobs:
         # Stage both CSV files in the repo_traffic_data directory
         git add repo_traffic_data/clones_history.csv repo_traffic_data/visitors_history.csv
         
-        # Check if there are any changes to commit
-        if [[ -n $(git status -s) ]]; then
-          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
-          git pull --rebase origin main
-          git push origin main
-        else
-          echo "No new traffic data to update"
-        fi
+        # Always try to commit and push, even if there are no changes
+        git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")" || true
+        git pull --rebase origin main
+        git push origin main
