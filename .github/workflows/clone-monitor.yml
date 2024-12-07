@@ -2,7 +2,7 @@ name: Monitor Repository Clones and Update Traffic Data
 
 on:
   schedule:
-    - cron: '0 13 * * *'
+    - cron: '0 */4 * * *'  # Run every 4 hours
   workflow_dispatch:  # Allow manual triggering
   push:
     branches:
@@ -24,6 +24,7 @@ jobs:
     - name: Fetch clone and visitor statistics
       env:
         GH_TOKEN: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
+        TZ: Europe/Bucharest  # Set timezone to Romania
       run: |
         # Ensure clone CSV exists with header if it doesn't
         if [ ! -f clones_history.csv ]; then
@@ -91,6 +92,8 @@ jobs:
         mv visitors_history_fixed.csv visitors_history.csv
     
     - name: Commit and push traffic data to clones_monitor
+      env:
+        TZ: Europe/Bucharest  # Set timezone to Romania
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
@@ -100,7 +103,7 @@ jobs:
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
-          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
+          git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
           git pull --rebase origin main
           git push origin main
         else
@@ -127,6 +130,8 @@ jobs:
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
     - name: Create repo_traffic_data directory and copy CSV files
+      env:
+        TZ: Europe/Bucharest  # Set timezone to Romania
       run: |
         # Ensure repo_traffic_data directory exists
         mkdir -p kicad-repo/repo_traffic_data
@@ -136,10 +141,12 @@ jobs:
         cp clones_monitor/visitors_history.csv kicad-repo/repo_traffic_data/visitors_history.csv
         
         # Create a timestamp file to track the last update
-        date -u +"%Y-%m-%d %H:%M:%S" > kicad-repo/repo_traffic_data/last_update.txt
+        date +"%Y-%m-%d %H:%M:%S %Z" > kicad-repo/repo_traffic_data/last_update.txt
     
     - name: Commit and push traffic data to KiCAD repository
       working-directory: kicad-repo
+      env:
+        TZ: Europe/Bucharest  # Set timezone to Romania
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
@@ -149,7 +156,7 @@ jobs:
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s repo_traffic_data) ]]; then
-          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
+          git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
           git pull --rebase origin main
           git push origin main
         else
