@@ -134,6 +134,9 @@ jobs:
         # Copy existing CSV files from clones_monitor to repo_traffic_data
         cp clones_monitor/clones_history.csv kicad-repo/repo_traffic_data/clones_history.csv
         cp clones_monitor/visitors_history.csv kicad-repo/repo_traffic_data/visitors_history.csv
+        
+        # Create a timestamp file to track the last update
+        date -u +"%Y-%m-%d %H:%M:%S" > kicad-repo/repo_traffic_data/last_update.txt
     
     - name: Commit and push traffic data to KiCAD repository
       working-directory: kicad-repo
@@ -141,10 +144,14 @@ jobs:
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Stage both CSV files in the repo_traffic_data directory
-        git add repo_traffic_data/clones_history.csv repo_traffic_data/visitors_history.csv
+        # Stage files in the repo_traffic_data directory
+        git add repo_traffic_data/*
         
-        # Always try to commit and push, even if there are no changes
-        git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")" || true
-        git pull --rebase origin main
-        git push origin main
+        # Check if there are any changes to commit
+        if [[ -n $(git status -s repo_traffic_data) ]]; then
+          git commit -m "Update clone and visitor statistics for $(date -u +"%Y-%m-%d %H:%M:%S")"
+          git pull --rebase origin main
+          git push origin main
+        else
+          echo "No new traffic data to update"
+        fi
