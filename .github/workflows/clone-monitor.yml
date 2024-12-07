@@ -137,9 +137,6 @@ jobs:
         # Copy CSV files from clones_monitor to repo_traffic_data
         cp clones_monitor/clones_history.csv kicad-repo/repo_traffic_data/clones_history.csv
         cp clones_monitor/visitors_history.csv kicad-repo/repo_traffic_data/visitors_history.csv
-        
-        # Create a timestamp file to track the last update
-        date +"%Y-%m-%d %H:%M:%S %Z" > kicad-repo/repo_traffic_data/last_update.txt
     
     - name: Commit and push traffic data to KiCAD repository
       working-directory: kicad-repo
