@@ -129,14 +129,12 @@ jobs:
         path: kicad-repo
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
-    - name: Create repo_traffic_data directory and copy CSV files
-      env:
-        TZ: Europe/Bucharest  # Set timezone to Romania
+    - name: Copy CSV files to KiCAD repository
       run: |
         # Ensure repo_traffic_data directory exists
         mkdir -p kicad-repo/repo_traffic_data
         
-        # Copy existing CSV files from clones_monitor to repo_traffic_data
+        # Copy CSV files from clones_monitor to repo_traffic_data
         cp clones_monitor/clones_history.csv kicad-repo/repo_traffic_data/clones_history.csv
         cp clones_monitor/visitors_history.csv kicad-repo/repo_traffic_data/visitors_history.csv
         
@@ -145,8 +143,6 @@ jobs:
     
     - name: Commit and push traffic data to KiCAD repository
       working-directory: kicad-repo
-      env:
-        TZ: Europe/Bucharest  # Set timezone to Romania
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
