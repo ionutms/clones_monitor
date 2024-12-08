@@ -115,8 +115,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Wait for 2 minutes
-      run: sleep 120
+    - name: Wait for 10 seconds
+      run: sleep 10
     
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
