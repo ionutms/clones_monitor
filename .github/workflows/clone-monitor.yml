@@ -146,12 +146,7 @@ jobs:
         
         # Stage files in the repo_traffic_data directory
         git add repo_traffic_data/*
-        
-        # Check if there are any changes to commit
-        if [[ -n $(git status -s repo_traffic_data) ]]; then
-          git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
-          git pull --rebase origin main
-          git push origin main
-        else
-          echo "No new traffic data to update"
-        fi
+
+        git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
+        git pull --rebase origin main
+        git push origin main
