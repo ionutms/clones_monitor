@@ -2,8 +2,8 @@ name: Monitor Repository Clones and Update Traffic Data
 
 on:
   schedule:
-    - cron: '0 * * * *'     # First job runs at the start of every hour interval
-    - cron: '1 * * * *'     # Second job runs 1 minutes after the first job
+    - cron: '0 */2 * * *'     # First job runs at the start of every 2 hours
+    - cron: '5 */2 * * *'     # Second job runs 5 minutes after the first job
   workflow_dispatch:  # Allow manual triggering
   push:
     branches:
