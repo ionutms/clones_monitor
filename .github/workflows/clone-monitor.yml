@@ -226,8 +226,8 @@ jobs:
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Stage files in the repo_traffic_data directory
-        git add repo_traffic_data/*
+        # Force add files in the repo_traffic_data directory
+        git add -f repo_traffic_data/*
 
         # Check if there are any changes to commit
         if [[ -n $(git status -s repo_traffic_data) ]]; then
@@ -244,8 +244,8 @@ jobs:
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Stage files in the repo_traffic_data directory
-        git add repo_traffic_data/*
+        # Force add files in the repo_traffic_data directory
+        git add -f repo_traffic_data/*
 
         # Check if there are any changes to commit
         if [[ -n $(git status -s repo_traffic_data) ]]; then
