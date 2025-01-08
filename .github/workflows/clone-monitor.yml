@@ -206,19 +206,18 @@ jobs:
         cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/visitors_history.csv
 
         # For second repository in the first repo
-        mkdir -p repo1/repo_traffic_data/second_repo
         if [ -f "clones_monitor/repo2_clones_history.csv" ]; then
-            cp clones_monitor/repo2_clones_history.csv repo1/repo_traffic_data/second_repo/clones_history.csv
+            cp clones_monitor/repo2_clones_history.csv repo1/repo_traffic_data/repo2_clones_history.csv
         else
             echo "Warning: repo2_clones_history.csv not found in clones_monitor directory"
-            cp clones_monitor/clones_history.csv repo1/repo_traffic_data/second_repo/clones_history.csv
+            cp clones_monitor/clones_history.csv repo1/repo_traffic_data/repo2_clones_history.csv
         fi
 
         if [ -f "clones_monitor/repo2_visitors_history.csv" ]; then
-            cp clones_monitor/repo2_visitors_history.csv repo1/repo_traffic_data/second_repo/visitors_history.csv
+            cp clones_monitor/repo2_visitors_history.csv repo1/repo_traffic_data/repo2_visitors_history.csv
         else
             echo "Warning: repo2_visitors_history.csv not found in clones_monitor directory"
-            cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/second_repo/visitors_history.csv
+            cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/repo2_visitors_history.csv
         fi
     - name: Commit and push traffic data to first repository
       working-directory: repo1
