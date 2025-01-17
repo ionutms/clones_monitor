@@ -50,7 +50,7 @@ jobs:
         # First repository to monitor
         repo1="ionutms/KiCAD_Symbols_Generator"
         # Second repository to monitor
-        repo2="ionutms/KiCad_Demo_Project"
+        repo2="ionutms/Minimal_ADP1032"
         
         # Fetch clones for the first repository's main branch and append to clone CSV
         gh api "repos/$repo1/traffic/clones?per_page=100&ref=main" | \
@@ -194,7 +194,7 @@ jobs:
     - name: Checkout second repository
       uses: actions/checkout@v4
       with:
-        repository: ionutms/KiCad_Demo_Project
+        repository: ionutms/Minimal_ADP1032
         path: repo2
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
