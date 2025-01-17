@@ -38,13 +38,13 @@ jobs:
         fi
         
         # Ensure second repo clone CSV exists with header if it doesn't
-        if [ ! -f repo2_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > repo2_clones_history.csv
+        if [ ! -f minimal_adp1032_clones_history.csv ]; then
+          echo "clone_timestamp,total_clones,unique_clones" > minimal_adp1032_clones_history.csv
         fi
         
         # Ensure second repo visitors CSV exists with header if it doesn't
-        if [ ! -f repo2_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > repo2_visitors_history.csv
+        if [ ! -f minimal_adp1032_visitors_history.csv ]; then
+          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adp1032_visitors_history.csv
         fi
         
         # First repository to monitor
@@ -83,7 +83,7 @@ jobs:
             .count,
             .uniques
           ] | @csv)[]
-        ' >> repo2_clones_history.csv
+        ' >> minimal_adp1032_clones_history.csv
         
         # Fetch visitors for the second repository's main branch and append to visitors CSV
         gh api "repos/$repo2/traffic/views?per_page=100&ref=main" | \
@@ -94,7 +94,7 @@ jobs:
             .count,
             .uniques
           ] | @csv)[]
-        ' >> repo2_visitors_history.csv
+        ' >> minimal_adp1032_visitors_history.csv
     
     - name: Remove duplicate rows from CSVs
       run: |
@@ -127,7 +127,7 @@ jobs:
         mv visitors_history_fixed.csv visitors_history.csv
         
         # Process second repo clone CSV
-        echo "clone_timestamp,total_clones,unique_clones" > repo2_clones_history_fixed.csv
+        echo "clone_timestamp,total_clones,unique_clones" > minimal_adp1032_clones_history_fixed.csv
         awk '
           BEGIN { FS=OFS="," }
           NR==1 && $1 == "clone_timestamp" { next }
@@ -137,11 +137,11 @@ jobs:
               print data[timestamp]
             }
           }
-        ' repo2_clones_history.csv | sort -t, -k1 >> repo2_clones_history_fixed.csv
-        mv repo2_clones_history_fixed.csv repo2_clones_history.csv
+        ' minimal_adp1032_clones_history.csv | sort -t, -k1 >> minimal_adp1032_clones_history_fixed.csv
+        mv minimal_adp1032_clones_history_fixed.csv minimal_adp1032_clones_history.csv
         
         # Process second repo visitors CSV
-        echo "visitor_timestamp,total_visitors,unique_visitors" > repo2_visitors_history_fixed.csv
+        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adp1032_visitors_history_fixed.csv
         awk '
           BEGIN { FS=OFS="," }
           NR==1 && $1 == "visitor_timestamp" { next }
@@ -151,8 +151,8 @@ jobs:
               print data[timestamp]
             }
           }
-        ' repo2_visitors_history.csv | sort -t, -k1 >> repo2_visitors_history_fixed.csv
-        mv repo2_visitors_history_fixed.csv repo2_visitors_history.csv
+        ' minimal_adp1032_visitors_history.csv | sort -t, -k1 >> minimal_adp1032_visitors_history_fixed.csv
+        mv minimal_adp1032_visitors_history_fixed.csv minimal_adp1032_visitors_history.csv
     
     - name: Commit and push traffic data to clones_monitor
       env:
@@ -162,7 +162,7 @@ jobs:
         git config user.email '<>'
         
         # Stage both CSV files
-        git add clones_history.csv visitors_history.csv repo2_clones_history.csv repo2_visitors_history.csv
+        git add clones_history.csv visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
@@ -206,18 +206,18 @@ jobs:
         cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/visitors_history.csv
 
         # For second repository in the first repo
-        if [ -f "clones_monitor/repo2_clones_history.csv" ]; then
-            cp clones_monitor/repo2_clones_history.csv repo1/repo_traffic_data/repo2_clones_history.csv
+        if [ -f "clones_monitor/minimal_adp1032_clones_history.csv" ]; then
+            cp clones_monitor/minimal_adp1032_clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
         else
-            echo "Warning: repo2_clones_history.csv not found in clones_monitor directory"
-            cp clones_monitor/clones_history.csv repo1/repo_traffic_data/repo2_clones_history.csv
+            echo "Warning: minimal_adp1032_clones_history.csv not found in clones_monitor directory"
+            cp clones_monitor/clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
         fi
 
-        if [ -f "clones_monitor/repo2_visitors_history.csv" ]; then
-            cp clones_monitor/repo2_visitors_history.csv repo1/repo_traffic_data/repo2_visitors_history.csv
+        if [ -f "clones_monitor/minimal_adp1032_visitors_history.csv" ]; then
+            cp clones_monitor/minimal_adp1032_visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
         else
-            echo "Warning: repo2_visitors_history.csv not found in clones_monitor directory"
-            cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/repo2_visitors_history.csv
+            echo "Warning: minimal_adp1032_visitors_history.csv not found in clones_monitor directory"
+            cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
         fi
     - name: Commit and push traffic data to first repository
       working-directory: repo1
