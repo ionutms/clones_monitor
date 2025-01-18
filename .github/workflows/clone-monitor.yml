@@ -28,13 +28,13 @@ jobs:
         TZ: Europe/Bucharest  # Set timezone to Romania
       run: |
         # Ensure clone CSV exists with header if it doesn't
-        if [ ! -f clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > clones_history.csv
+        if [ ! -f kicad_symbols_generator_clones_history.csv ]; then
+          echo "clone_timestamp,total_clones,unique_clones" > kicad_symbols_generator_clones_history.csv
         fi
         
         # Ensure visitors CSV exists with header if it doesn't
-        if [ ! -f visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > visitors_history.csv
+        if [ ! -f kicad_symbols_generator_visitors_history.csv ]; then
+          echo "visitor_timestamp,total_visitors,unique_visitors" > kicad_symbols_generator_visitors_history.csv
         fi
         
         # Ensure second repo clone CSV exists with header if it doesn't
@@ -73,7 +73,7 @@ jobs:
             .count,
             .uniques
           ] | @csv)[]
-        ' >> clones_history.csv
+        ' >> kicad_symbols_generator_clones_history.csv
         
         # Fetch visitors for the first repository's main branch and append to visitors CSV
         gh api "repos/$repo1/traffic/views?per_page=100&ref=main" | \
@@ -84,7 +84,7 @@ jobs:
             .count,
             .uniques
           ] | @csv)[]
-        ' >> visitors_history.csv
+        ' >> kicad_symbols_generator_visitors_history.csv
         
         # Fetch clones for the second repository's main branch and append to clone CSV
         gh api "repos/$repo2/traffic/clones?per_page=100&ref=main" | \
@@ -143,8 +143,8 @@ jobs:
               print data[timestamp]
             }
           }
-        ' clones_history.csv | sort -t, -k1 >> clones_history_fixed.csv
-        mv clones_history_fixed.csv clones_history.csv
+        ' kicad_symbols_generator_clones_history.csv | sort -t, -k1 >> clones_history_fixed.csv
+        mv clones_history_fixed.csv kicad_symbols_generator_clones_history.csv
         
         # Process visitors CSV
         echo "visitor_timestamp,total_visitors,unique_visitors" > visitors_history_fixed.csv
@@ -157,8 +157,8 @@ jobs:
               print data[timestamp]
             }
           }
-        ' visitors_history.csv | sort -t, -k1 >> visitors_history_fixed.csv
-        mv visitors_history_fixed.csv visitors_history.csv
+        ' kicad_symbols_generator_visitors_history.csv | sort -t, -k1 >> visitors_history_fixed.csv
+        mv visitors_history_fixed.csv kicad_symbols_generator_visitors_history.csv
         
         # Process second repo clone CSV
         echo "clone_timestamp,total_clones,unique_clones" > minimal_adp1032_clones_history_fixed.csv
@@ -224,7 +224,7 @@ jobs:
         git config user.email '<>'
         
         # Stage all CSV files
-        git add clones_history.csv visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv
+        git add kicad_symbols_generator_clones_history.csv kicad_symbols_generator_visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
@@ -259,8 +259,8 @@ jobs:
         mkdir -p repo1/repo_traffic_data
         
         # Copy KiCAD_Symbols_Generator data
-        cp clones_monitor/clones_history.csv repo1/repo_traffic_data/clones_history.csv
-        cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/visitors_history.csv
+        cp clones_monitor/kicad_symbols_generator_clones_history.csv repo1/repo_traffic_data/kicad_symbols_generator_clones_history.csv
+        cp clones_monitor/kicad_symbols_generator_visitors_history.csv repo1/repo_traffic_data/kicad_symbols_generator_visitors_history.csv
 
         # Copy ADP1032 data
         if [ -f "clones_monitor/minimal_adp1032_clones_history.csv" ]; then
