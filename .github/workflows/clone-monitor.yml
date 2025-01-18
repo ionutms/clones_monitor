@@ -253,45 +253,37 @@ jobs:
         path: repo1
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
-    - name: Checkout third repository
-      uses: actions/checkout@v4
-      with:
-        repository: ionutms/Minimal_MAX14906
-        path: repo3
-        token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
-    
-    - name: Copy CSV files to repositories
+    - name: Copy CSV files to repository
       run: |
-        # For first repository
+        # Create traffic data directory in first repository
         mkdir -p repo1/repo_traffic_data
+        
+        # Copy KiCAD_Symbols_Generator data
         cp clones_monitor/clones_history.csv repo1/repo_traffic_data/clones_history.csv
         cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/visitors_history.csv
 
-        # For ADP1032 data in the first repo
+        # Copy ADP1032 data
         if [ -f "clones_monitor/minimal_adp1032_clones_history.csv" ]; then
             cp clones_monitor/minimal_adp1032_clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
         else
             echo "Warning: minimal_adp1032_clones_history.csv not found in clones_monitor directory"
-            cp clones_monitor/clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
         fi
 
         if [ -f "clones_monitor/minimal_adp1032_visitors_history.csv" ]; then
             cp clones_monitor/minimal_adp1032_visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
         else
             echo "Warning: minimal_adp1032_visitors_history.csv not found in clones_monitor directory"
-            cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
         fi
 
-        # For third repository
-        mkdir -p repo3/repo_traffic_data
+        # Copy MAX14906 data
         if [ -f "clones_monitor/minimal_max14906_clones_history.csv" ]; then
-            cp clones_monitor/minimal_max14906_clones_history.csv repo3/repo_traffic_data/clones_history.csv
+            cp clones_monitor/minimal_max14906_clones_history.csv repo1/repo_traffic_data/minimal_max14906_clones_history.csv
         else
             echo "Warning: minimal_max14906_clones_history.csv not found in clones_monitor directory"
         fi
 
         if [ -f "clones_monitor/minimal_max14906_visitors_history.csv" ]; then
-            cp clones_monitor/minimal_max14906_visitors_history.csv repo3/repo_traffic_data/visitors_history.csv
+            cp clones_monitor/minimal_max14906_visitors_history.csv repo1/repo_traffic_data/minimal_max14906_visitors_history.csv
         else
             echo "Warning: minimal_max14906_visitors_history.csv not found in clones_monitor directory"
         fi
@@ -312,25 +304,4 @@ jobs:
           git push origin main
         else
           echo "No new traffic data to update"
-        fi
-
-    - name: Commit and push traffic data to third repository
-      working-directory: repo3
-      run: |
-        git config user.name 'GitHub Actions Bot'
-        git config user.email '<>'
-        
-        # Check if repo_traffic_data exists and has files
-        if [ -d "repo_traffic_data" ] && [ "$(ls -A repo_traffic_data)" ]; then
-          git add -f repo_traffic_data/*
-          # Check if there are any changes to commit
-          if [[ -n $(git status -s repo_traffic_data) ]]; then
-            git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
-            git pull --rebase origin main
-            git push origin main
-          else
-            echo "No new traffic data to update"
-          fi
-        else
-          echo "No files in repo_traffic_data. Skipping commit."
         fi
