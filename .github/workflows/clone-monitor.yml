@@ -253,13 +253,6 @@ jobs:
         path: repo1
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
     
-    - name: Checkout second repository
-      uses: actions/checkout@v4
-      with:
-        repository: ionutms/Minimal_ADP1032
-        path: repo2
-        token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
-
     - name: Checkout third repository
       uses: actions/checkout@v4
       with:
@@ -274,18 +267,19 @@ jobs:
         cp clones_monitor/clones_history.csv repo1/repo_traffic_data/clones_history.csv
         cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/visitors_history.csv
 
-        # For second repository
-        mkdir -p repo2/repo_traffic_data
+        # For ADP1032 data in the first repo
         if [ -f "clones_monitor/minimal_adp1032_clones_history.csv" ]; then
-            cp clones_monitor/minimal_adp1032_clones_history.csv repo2/repo_traffic_data/clones_history.csv
+            cp clones_monitor/minimal_adp1032_clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
         else
             echo "Warning: minimal_adp1032_clones_history.csv not found in clones_monitor directory"
+            cp clones_monitor/clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
         fi
 
         if [ -f "clones_monitor/minimal_adp1032_visitors_history.csv" ]; then
-            cp clones_monitor/minimal_adp1032_visitors_history.csv repo2/repo_traffic_data/visitors_history.csv
+            cp clones_monitor/minimal_adp1032_visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
         else
             echo "Warning: minimal_adp1032_visitors_history.csv not found in clones_monitor directory"
+            cp clones_monitor/visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
         fi
 
         # For third repository
@@ -319,9 +313,9 @@ jobs:
         else
           echo "No new traffic data to update"
         fi
-        
-    - name: Commit and push traffic data to second repository
-      working-directory: repo2
+
+    - name: Commit and push traffic data to third repository
+      working-directory: repo3
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
@@ -340,23 +334,3 @@ jobs:
         else
           echo "No files in repo_traffic_data. Skipping commit."
         fi
-    - name: Commit and push traffic data to third repository
-      working-directory: repo3
-      run: |
-            git config user.name 'GitHub Actions Bot'
-            git config user.email '<>'
-            
-            # Check if repo_traffic_data exists and has files
-            if [ -d "repo_traffic_data" ] && [ "$(ls -A repo_traffic_data)" ]; then
-              git add -f repo_traffic_data/*
-              # Check if there are any changes to commit
-              if [[ -n $(git status -s repo_traffic_data) ]]; then
-                git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
-                git pull --rebase origin main
-                git push origin main
-              else
-                echo "No new traffic data to update"
-              fi
-            else
-              echo "No files in repo_traffic_data. Skipping commit."
-            fi
