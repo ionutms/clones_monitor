@@ -56,6 +56,16 @@ jobs:
         if [ ! -f minimal_max14906_visitors_history.csv ]; then
           echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_max14906_visitors_history.csv
         fi
+
+        # Ensure fourth repo clone CSV exists with header if it doesn't
+        if [ ! -f minimal_ad74413r_clones_history.csv ]; then
+          echo "clone_timestamp,total_clones,unique_clones" > minimal_ad74413r_clones_history.csv
+        fi
+        
+        # Ensure fourth repo visitors CSV exists with header if it doesn't
+        if [ ! -f minimal_ad74413r_visitors_history.csv ]; then
+          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_ad74413r_visitors_history.csv
+        fi
         
         # First repository to monitor
         repo1="ionutms/KiCAD_Symbols_Generator"
@@ -63,6 +73,8 @@ jobs:
         repo2="ionutms/Minimal_ADP1032"
         # Third repository to monitor
         repo3="ionutms/Minimal_MAX14906"
+        # Fourth repository to monitor
+        repo4="ionutms/Minimal_AD74413R"
         
         # Fetch clones for the first repository's main branch and append to clone CSV
         gh api "repos/$repo1/traffic/clones?per_page=100&ref=main" | \
@@ -129,6 +141,28 @@ jobs:
             .uniques
           ] | @csv)[]
         ' >> minimal_max14906_visitors_history.csv
+
+        # Fetch clones for the fourth repository's main branch and append to clone CSV
+        gh api "repos/$repo4/traffic/clones?per_page=100&ref=main" | \
+        jq -r '
+          .clones |
+          map([
+            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
+            .count,
+            .uniques
+          ] | @csv)[]
+        ' >> minimal_ad74413r_clones_history.csv
+        
+        # Fetch visitors for the fourth repository's main branch and append to visitors CSV
+        gh api "repos/$repo4/traffic/views?per_page=100&ref=main" | \
+        jq -r '
+          .views |
+          map([
+            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
+            .count,
+            .uniques
+          ] | @csv)[]
+        ' >> minimal_ad74413r_visitors_history.csv
     
     - name: Remove duplicate rows from CSVs
       run: |
@@ -215,6 +249,34 @@ jobs:
           }
         ' minimal_max14906_visitors_history.csv | sort -t, -k1 >> minimal_max14906_visitors_history_fixed.csv
         mv minimal_max14906_visitors_history_fixed.csv minimal_max14906_visitors_history.csv
+
+        # Process fourth repo clone CSV
+        echo "clone_timestamp,total_clones,unique_clones" > minimal_ad74413r_clones_history_fixed.csv
+        awk '
+          BEGIN { FS=OFS="," }
+          NR==1 && $1 == "clone_timestamp" { next }
+          { data[$1] = $0 }
+          END {
+            for (timestamp in data) {
+              print data[timestamp]
+            }
+          }
+        ' minimal_ad74413r_clones_history.csv | sort -t, -k1 >> minimal_ad74413r_clones_history_fixed.csv
+        mv minimal_ad74413r_clones_history_fixed.csv minimal_ad74413r_clones_history.csv
+        
+        # Process fourth repo visitors CSV
+        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_ad74413r_visitors_history_fixed.csv
+        awk '
+          BEGIN { FS=OFS="," }
+          NR==1 && $1 == "visitor_timestamp" { next }
+          { data[$1] = $0 }
+          END {
+            for (timestamp in data) {
+              print data[timestamp]
+            }
+          }
+        ' minimal_ad74413r_visitors_history.csv | sort -t, -k1 >> minimal_ad74413r_visitors_history_fixed.csv
+        mv minimal_ad74413r_visitors_history_fixed.csv minimal_ad74413r_visitors_history.csv
     
     - name: Commit and push traffic data to clones_monitor
       env:
@@ -224,7 +286,7 @@ jobs:
         git config user.email '<>'
         
         # Stage all CSV files
-        git add kicad_symbols_generator_clones_history.csv kicad_symbols_generator_visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv
+        git add kicad_symbols_generator_clones_history.csv kicad_symbols_generator_visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv minimal_ad74413r_clones_history.csv minimal_ad74413r_visitors_history.csv
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
@@ -261,7 +323,6 @@ jobs:
         # Copy KiCAD_Symbols_Generator data
         cp clones_monitor/kicad_symbols_generator_clones_history.csv repo1/repo_traffic_data/kicad_symbols_generator_clones_history.csv
         cp clones_monitor/kicad_symbols_generator_visitors_history.csv repo1/repo_traffic_data/kicad_symbols_generator_visitors_history.csv
-
         # Copy ADP1032 data
         if [ -f "clones_monitor/minimal_adp1032_clones_history.csv" ]; then
             cp clones_monitor/minimal_adp1032_clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
@@ -286,6 +347,18 @@ jobs:
             cp clones_monitor/minimal_max14906_visitors_history.csv repo1/repo_traffic_data/minimal_max14906_visitors_history.csv
         else
             echo "Warning: minimal_max14906_visitors_history.csv not found in clones_monitor directory"
+        fi
+        # Copy AD74413R data
+        if [ -f "clones_monitor/minimal_ad74413r_clones_history.csv" ]; then
+            cp clones_monitor/minimal_ad74413r_clones_history.csv repo1/repo_traffic_data/minimal_ad74413r_clones_history.csv
+        else
+            echo "Warning: minimal_ad74413r_clones_history.csv not found in clones_monitor directory"
+        fi
+
+        if [ -f "clones_monitor/minimal_ad74413r_visitors_history.csv" ]; then
+            cp clones_monitor/minimal_ad74413r_visitors_history.csv repo1/repo_traffic_data/minimal_ad74413r_visitors_history.csv
+        else
+            echo "Warning: minimal_ad74413r_visitors_history.csv not found in clones_monitor directory"
         fi
 
     - name: Commit and push traffic data to first repository
