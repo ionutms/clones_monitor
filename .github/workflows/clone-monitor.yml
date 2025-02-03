@@ -76,6 +76,16 @@ jobs:
         if [ ! -f modular_software_configurable_io_plc_visitors_history.csv ]; then
           echo "visitor_timestamp,total_visitors,unique_visitors" > modular_software_configurable_io_plc_visitors_history.csv
         fi
+
+        # Ensure sixth repo clone CSV exists with header if it doesn't
+        if [ ! -f minimal_adin1110_clones_history.csv ]; then
+          echo "clone_timestamp,total_clones,unique_clones" > minimal_adin1110_clones_history.csv
+        fi
+        
+        # Ensure sixth repo visitors CSV exists with header if it doesn't
+        if [ ! -f minimal_adin1110_visitors_history.csv ]; then
+          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adin1110_visitors_history.csv
+        fi
         
         # First repository to monitor
         repo1="ionutms/KiCAD_Symbols_Generator"
@@ -87,6 +97,8 @@ jobs:
         repo4="ionutms/Minimal_AD74413R"
         # Fifth repository to monitor
         repo5="ionutms/Modular_Software_Configurable_IO_PLC"
+        # Sixth repository to monitor
+        repo6="ionutms/Minimal_ADIN1110"
         
         # Fetch clones for the first repository's main branch and append to clone CSV
         gh api "repos/$repo1/traffic/clones?per_page=100&ref=main" | \
@@ -197,10 +209,32 @@ jobs:
             .uniques
           ] | @csv)[]
         ' >> modular_software_configurable_io_plc_visitors_history.csv
+
+        # Fetch clones for the sixth repository's main branch and append to clone CSV
+        gh api "repos/$repo6/traffic/clones?per_page=100&ref=main" | \
+        jq -r '
+          .clones |
+          map([
+            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
+            .count,
+            .uniques
+          ] | @csv)[]
+        ' >> minimal_adin1110_clones_history.csv
+        
+        # Fetch visitors for the sixth repository's main branch and append to visitors CSV
+        gh api "repos/$repo6/traffic/views?per_page=100&ref=main" | \
+        jq -r '
+          .views |
+          map([
+            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
+            .count,
+            .uniques
+          ] | @csv)[]
+        ' >> minimal_adin1110_visitors_history.csv
     
     - name: Remove duplicate rows from CSVs
       run: |
-        # Process clone CSV
+        # Process clone CSV for first repository
         echo "clone_timestamp,total_clones,unique_clones" > clones_history_fixed.csv
         awk '
           BEGIN { FS=OFS="," }
@@ -214,7 +248,7 @@ jobs:
         ' kicad_symbols_generator_clones_history.csv | sort -t, -k1 >> clones_history_fixed.csv
         mv clones_history_fixed.csv kicad_symbols_generator_clones_history.csv
         
-        # Process visitors CSV
+        # Process visitors CSV for first repository
         echo "visitor_timestamp,total_visitors,unique_visitors" > visitors_history_fixed.csv
         awk '
           BEGIN { FS=OFS="," }
@@ -339,6 +373,34 @@ jobs:
           }
         ' modular_software_configurable_io_plc_visitors_history.csv | sort -t, -k1 >> modular_software_configurable_io_plc_visitors_history_fixed.csv
         mv modular_software_configurable_io_plc_visitors_history_fixed.csv modular_software_configurable_io_plc_visitors_history.csv
+
+        # Process sixth repo clone CSV
+        echo "clone_timestamp,total_clones,unique_clones" > minimal_adin1110_clones_history_fixed.csv
+        awk '
+          BEGIN { FS=OFS="," }
+          NR==1 && $1 == "clone_timestamp" { next }
+          { data[$1] = $0 }
+          END {
+            for (timestamp in data) {
+              print data[timestamp]
+            }
+          }
+        ' minimal_adin1110_clones_history.csv | sort -t, -k1 >> minimal_adin1110_clones_history_fixed.csv
+        mv minimal_adin1110_clones_history_fixed.csv minimal_adin1110_clones_history.csv
+
+        # Process sixth repo visitors CSV
+        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adin1110_visitors_history_fixed.csv
+        awk '
+          BEGIN { FS=OFS="," }
+          NR==1 && $1 == "visitor_timestamp" { next }
+          { data[$1] = $0 }
+          END {
+            for (timestamp in data) {
+              print data[timestamp]
+            }
+          }
+        ' minimal_adin1110_visitors_history.csv | sort -t, -k1 >> minimal_adin1110_visitors_history_fixed.csv
+        mv minimal_adin1110_visitors_history_fixed.csv minimal_adin1110_visitors_history.csv
     
     - name: Commit and push traffic data to clones_monitor
       env:
@@ -348,7 +410,7 @@ jobs:
         git config user.email '<>'
         
         # Stage all CSV files
-        git add kicad_symbols_generator_clones_history.csv kicad_symbols_generator_visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv minimal_ad74413r_clones_history.csv minimal_ad74413r_visitors_history.csv modular_software_configurable_io_plc_clones_history.csv modular_software_configurable_io_plc_visitors_history.csv
+        git add kicad_symbols_generator_clones_history.csv kicad_symbols_generator_visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv minimal_ad74413r_clones_history.csv minimal_ad74413r_visitors_history.csv modular_software_configurable_io_plc_clones_history.csv modular_software_configurable_io_plc_visitors_history.csv minimal_adin1110_clones_history.csv minimal_adin1110_visitors_history.csv
         
         # Check if there are any changes to commit
         if [[ -n $(git status -s) ]]; then
@@ -436,6 +498,19 @@ jobs:
             cp clones_monitor/modular_software_configurable_io_plc_visitors_history.csv repo1/repo_traffic_data/modular_software_configurable_io_plc_visitors_history.csv
         else
             echo "Warning: modular_software_configurable_io_plc_visitors_history.csv not found in clones_monitor directory"
+        fi
+
+        # Copy ADIN1110 data
+        if [ -f "clones_monitor/minimal_adin1110_clones_history.csv" ]; then
+            cp clones_monitor/minimal_adin1110_clones_history.csv repo1/repo_traffic_data/minimal_adin1110_clones_history.csv
+        else
+            echo "Warning: minimal_adin1110_clones_history.csv not found in clones_monitor directory"
+        fi
+
+        if [ -f "clones_monitor/minimal_adin1110_visitors_history.csv" ]; then
+            cp clones_monitor/minimal_adin1110_visitors_history.csv repo1/repo_traffic_data/minimal_adin1110_visitors_history.csv
+        else
+            echo "Warning: minimal_adin1110_visitors_history.csv not found in clones_monitor directory"
         fi
 
     - name: Commit and push traffic data to first repository
