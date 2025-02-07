@@ -7,7 +7,39 @@ on:
   workflow_dispatch:  # Allow manual triggering
   push:
     branches:
-      - main  # Trigger on pushes to the main branch
+      - main
+
+# Define repository configurations
+env:
+  REPOSITORIES: |
+    {
+      "repos": [
+        {
+          "name": "KiCAD_Symbols_Generator",
+          "prefix": "kicad_symbols_generator"
+        },
+        {
+          "name": "Minimal_ADP1032",
+          "prefix": "minimal_adp1032"
+        },
+        {
+          "name": "Minimal_MAX14906",
+          "prefix": "minimal_max14906"
+        },
+        {
+          "name": "Minimal_AD74413R",
+          "prefix": "minimal_ad74413r"
+        },
+        {
+          "name": "Modular_Software_Configurable_IO_PLC",
+          "prefix": "modular_software_configurable_io_plc"
+        },
+        {
+          "name": "Minimal_ADIN1110",
+          "prefix": "minimal_adin1110"
+        }
+      ]
+    }
 
 jobs:
   monitor-traffic:
@@ -17,402 +49,106 @@ jobs:
     - name: Checkout clones_monitor repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Fetch all history for all branches and tags
+        fetch-depth: 0
       
     - name: Setup GitHub CLI
       uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
       
-    - name: Fetch clone and visitor statistics
+    - name: Initialize CSV files
+      env:
+        TZ: Europe/Bucharest
+      run: |
+        # Create a function to initialize CSV files
+        init_csv() {
+          local prefix=$1
+          local type=$2
+          local file="${prefix}_${type}_history.csv"
+          local header="${type}_timestamp,total_${type}s,unique_${type}s"
+          
+          if [ ! -f "$file" ]; then
+            echo "$header" > "$file"
+          fi
+        }
+        
+        # Read repositories from JSON and initialize their CSV files
+        echo "$REPOSITORIES" | jq -r '.repos[] | .prefix' | while read -r prefix; do
+          init_csv "$prefix" "clones"
+          init_csv "$prefix" "visitors"
+        done
+
+    - name: Fetch traffic statistics
       env:
         GH_TOKEN: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
-        TZ: Europe/Bucharest  # Set timezone to Romania
+        TZ: Europe/Bucharest
       run: |
-        # Ensure clone CSV exists with header if it doesn't
-        if [ ! -f kicad_symbols_generator_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > kicad_symbols_generator_clones_history.csv
-        fi
+        # Function to fetch traffic data
+        fetch_traffic_data() {
+          local repo_name=$1
+          local prefix=$2
+          local type=$3
+          local endpoint="traffic/${type}s"
+          local output_file="${prefix}_${type}_history.csv"
+          
+          gh api "repos/ionutms/${repo_name}/${endpoint}?per_page=100&ref=main" | \
+          jq -r "
+            .${type}s |
+            map([
+              (.timestamp | sub(\"T.*\";\"\") | sub(\"Z\$\";\"\")) ,
+              .count,
+              .uniques
+            ] | @csv)[]
+          " >> "$output_file"
+        }
         
-        # Ensure visitors CSV exists with header if it doesn't
-        if [ ! -f kicad_symbols_generator_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > kicad_symbols_generator_visitors_history.csv
-        fi
-        
-        # Ensure second repo clone CSV exists with header if it doesn't
-        if [ ! -f minimal_adp1032_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > minimal_adp1032_clones_history.csv
-        fi
-        
-        # Ensure second repo visitors CSV exists with header if it doesn't
-        if [ ! -f minimal_adp1032_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adp1032_visitors_history.csv
-        fi
+        # Process each repository
+        echo "$REPOSITORIES" | jq -r '.repos[] | [.name, .prefix] | @tsv' | while IFS=$'\t' read -r name prefix; do
+          fetch_traffic_data "$name" "$prefix" "clone"
+          fetch_traffic_data "$name" "$prefix" "view"
+        done
 
-        # Ensure third repo clone CSV exists with header if it doesn't
-        if [ ! -f minimal_max14906_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > minimal_max14906_clones_history.csv
-        fi
-        
-        # Ensure third repo visitors CSV exists with header if it doesn't
-        if [ ! -f minimal_max14906_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_max14906_visitors_history.csv
-        fi
-
-        # Ensure fourth repo clone CSV exists with header if it doesn't
-        if [ ! -f minimal_ad74413r_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > minimal_ad74413r_clones_history.csv
-        fi
-        
-        # Ensure fourth repo visitors CSV exists with header if it doesn't
-        if [ ! -f minimal_ad74413r_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_ad74413r_visitors_history.csv
-        fi
-
-        # Ensure fifth repo clone CSV exists with header if it doesn't
-        if [ ! -f modular_software_configurable_io_plc_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > modular_software_configurable_io_plc_clones_history.csv
-        fi
-        
-        # Ensure fifth repo visitors CSV exists with header if it doesn't
-        if [ ! -f modular_software_configurable_io_plc_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > modular_software_configurable_io_plc_visitors_history.csv
-        fi
-
-        # Ensure sixth repo clone CSV exists with header if it doesn't
-        if [ ! -f minimal_adin1110_clones_history.csv ]; then
-          echo "clone_timestamp,total_clones,unique_clones" > minimal_adin1110_clones_history.csv
-        fi
-        
-        # Ensure sixth repo visitors CSV exists with header if it doesn't
-        if [ ! -f minimal_adin1110_visitors_history.csv ]; then
-          echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adin1110_visitors_history.csv
-        fi
-        
-        # First repository to monitor
-        repo1="ionutms/KiCAD_Symbols_Generator"
-        # Second repository to monitor
-        repo2="ionutms/Minimal_ADP1032"
-        # Third repository to monitor
-        repo3="ionutms/Minimal_MAX14906"
-        # Fourth repository to monitor
-        repo4="ionutms/Minimal_AD74413R"
-        # Fifth repository to monitor
-        repo5="ionutms/Modular_Software_Configurable_IO_PLC"
-        # Sixth repository to monitor
-        repo6="ionutms/Minimal_ADIN1110"
-        
-        # Fetch clones for the first repository's main branch and append to clone CSV
-        gh api "repos/$repo1/traffic/clones?per_page=100&ref=main" | \
-        jq -r '
-          .clones |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> kicad_symbols_generator_clones_history.csv
-        
-        # Fetch visitors for the first repository's main branch and append to visitors CSV
-        gh api "repos/$repo1/traffic/views?per_page=100&ref=main" | \
-        jq -r '
-          .views |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> kicad_symbols_generator_visitors_history.csv
-        
-        # Fetch clones for the second repository's main branch and append to clone CSV
-        gh api "repos/$repo2/traffic/clones?per_page=100&ref=main" | \
-        jq -r '
-          .clones |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_adp1032_clones_history.csv
-        
-        # Fetch visitors for the second repository's main branch and append to visitors CSV
-        gh api "repos/$repo2/traffic/views?per_page=100&ref=main" | \
-        jq -r '
-          .views |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_adp1032_visitors_history.csv
-
-        # Fetch clones for the third repository's main branch and append to clone CSV
-        gh api "repos/$repo3/traffic/clones?per_page=100&ref=main" | \
-        jq -r '
-          .clones |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_max14906_clones_history.csv
-        
-        # Fetch visitors for the third repository's main branch and append to visitors CSV
-        gh api "repos/$repo3/traffic/views?per_page=100&ref=main" | \
-        jq -r '
-          .views |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_max14906_visitors_history.csv
-
-        # Fetch clones for the fourth repository's main branch and append to clone CSV
-        gh api "repos/$repo4/traffic/clones?per_page=100&ref=main" | \
-        jq -r '
-          .clones |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_ad74413r_clones_history.csv
-        
-        # Fetch visitors for the fourth repository's main branch and append to visitors CSV
-        gh api "repos/$repo4/traffic/views?per_page=100&ref=main" | \
-        jq -r '
-          .views |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_ad74413r_visitors_history.csv
-
-        # Fetch clones for the fifth repository's main branch and append to clone CSV
-        gh api "repos/$repo5/traffic/clones?per_page=100&ref=main" | \
-        jq -r '
-          .clones |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> modular_software_configurable_io_plc_clones_history.csv
-        
-        # Fetch visitors for the fifth repository's main branch and append to visitors CSV
-        gh api "repos/$repo5/traffic/views?per_page=100&ref=main" | \
-        jq -r '
-          .views |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> modular_software_configurable_io_plc_visitors_history.csv
-
-        # Fetch clones for the sixth repository's main branch and append to clone CSV
-        gh api "repos/$repo6/traffic/clones?per_page=100&ref=main" | \
-        jq -r '
-          .clones |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_adin1110_clones_history.csv
-        
-        # Fetch visitors for the sixth repository's main branch and append to visitors CSV
-        gh api "repos/$repo6/traffic/views?per_page=100&ref=main" | \
-        jq -r '
-          .views |
-          map([
-            (.timestamp | sub("T.*";"") | sub("Z$";"")) ,
-            .count,
-            .uniques
-          ] | @csv)[]
-        ' >> minimal_adin1110_visitors_history.csv
-    
     - name: Remove duplicate rows from CSVs
       run: |
-        # Process clone CSV for first repository
-        echo "clone_timestamp,total_clones,unique_clones" > clones_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "clone_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
+        # Function to remove duplicates from CSV
+        deduplicate_csv() {
+          local prefix=$1
+          local type=$2
+          local input_file="${prefix}_${type}_history.csv"
+          local temp_file="${prefix}_${type}_history_fixed.csv"
+          local header="${type}_timestamp,total_${type}s,unique_${type}s"
+          
+          echo "$header" > "$temp_file"
+          awk '
+            BEGIN { FS=OFS="," }
+            NR==1 && $1 == "'${type}_timestamp'" { next }
+            { data[$1] = $0 }
+            END {
+              for (timestamp in data) {
+                print data[timestamp]
+              }
             }
-          }
-        ' kicad_symbols_generator_clones_history.csv | sort -t, -k1 >> clones_history_fixed.csv
-        mv clones_history_fixed.csv kicad_symbols_generator_clones_history.csv
+          ' "$input_file" | sort -t, -k1 >> "$temp_file"
+          mv "$temp_file" "$input_file"
+        }
         
-        # Process visitors CSV for first repository
-        echo "visitor_timestamp,total_visitors,unique_visitors" > visitors_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "visitor_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' kicad_symbols_generator_visitors_history.csv | sort -t, -k1 >> visitors_history_fixed.csv
-        mv visitors_history_fixed.csv kicad_symbols_generator_visitors_history.csv
-        
-        # Process second repo clone CSV
-        echo "clone_timestamp,total_clones,unique_clones" > minimal_adp1032_clones_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "clone_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_adp1032_clones_history.csv | sort -t, -k1 >> minimal_adp1032_clones_history_fixed.csv
-        mv minimal_adp1032_clones_history_fixed.csv minimal_adp1032_clones_history.csv
-        
-        # Process second repo visitors CSV
-        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adp1032_visitors_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "visitor_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_adp1032_visitors_history.csv | sort -t, -k1 >> minimal_adp1032_visitors_history_fixed.csv
-        mv minimal_adp1032_visitors_history_fixed.csv minimal_adp1032_visitors_history.csv
+        # Process each repository
+        echo "$REPOSITORIES" | jq -r '.repos[] | .prefix' | while read -r prefix; do
+          deduplicate_csv "$prefix" "clones"
+          deduplicate_csv "$prefix" "visitors"
+        done
 
-        # Process third repo clone CSV
-        echo "clone_timestamp,total_clones,unique_clones" > minimal_max14906_clones_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "clone_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_max14906_clones_history.csv | sort -t, -k1 >> minimal_max14906_clones_history_fixed.csv
-        mv minimal_max14906_clones_history_fixed.csv minimal_max14906_clones_history.csv
-        
-        # Process third repo visitors CSV
-        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_max14906_visitors_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "visitor_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_max14906_visitors_history.csv | sort -t, -k1 >> minimal_max14906_visitors_history_fixed.csv
-        mv minimal_max14906_visitors_history_fixed.csv minimal_max14906_visitors_history.csv
-
-        # Process fourth repo clone CSV
-        echo "clone_timestamp,total_clones,unique_clones" > minimal_ad74413r_clones_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "clone_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_ad74413r_clones_history.csv | sort -t, -k1 >> minimal_ad74413r_clones_history_fixed.csv
-        mv minimal_ad74413r_clones_history_fixed.csv minimal_ad74413r_clones_history.csv
-        
-        # Process fourth repo visitors CSV
-        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_ad74413r_visitors_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "visitor_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_ad74413r_visitors_history.csv | sort -t, -k1 >> minimal_ad74413r_visitors_history_fixed.csv
-        mv minimal_ad74413r_visitors_history_fixed.csv minimal_ad74413r_visitors_history.csv
-
-        # Process fifth repo clone CSV
-        echo "clone_timestamp,total_clones,unique_clones" > modular_software_configurable_io_plc_clones_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "clone_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' modular_software_configurable_io_plc_clones_history.csv | sort -t, -k1 >> modular_software_configurable_io_plc_clones_history_fixed.csv
-        mv modular_software_configurable_io_plc_clones_history_fixed.csv modular_software_configurable_io_plc_clones_history.csv
-        
-        # Process fifth repo visitors CSV
-        echo "visitor_timestamp,total_visitors,unique_visitors" > modular_software_configurable_io_plc_visitors_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "visitor_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' modular_software_configurable_io_plc_visitors_history.csv | sort -t, -k1 >> modular_software_configurable_io_plc_visitors_history_fixed.csv
-        mv modular_software_configurable_io_plc_visitors_history_fixed.csv modular_software_configurable_io_plc_visitors_history.csv
-
-        # Process sixth repo clone CSV
-        echo "clone_timestamp,total_clones,unique_clones" > minimal_adin1110_clones_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "clone_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_adin1110_clones_history.csv | sort -t, -k1 >> minimal_adin1110_clones_history_fixed.csv
-        mv minimal_adin1110_clones_history_fixed.csv minimal_adin1110_clones_history.csv
-
-        # Process sixth repo visitors CSV
-        echo "visitor_timestamp,total_visitors,unique_visitors" > minimal_adin1110_visitors_history_fixed.csv
-        awk '
-          BEGIN { FS=OFS="," }
-          NR==1 && $1 == "visitor_timestamp" { next }
-          { data[$1] = $0 }
-          END {
-            for (timestamp in data) {
-              print data[timestamp]
-            }
-          }
-        ' minimal_adin1110_visitors_history.csv | sort -t, -k1 >> minimal_adin1110_visitors_history_fixed.csv
-        mv minimal_adin1110_visitors_history_fixed.csv minimal_adin1110_visitors_history.csv
-    
-    - name: Commit and push traffic data to clones_monitor
+    - name: Commit and push traffic data
       env:
-        TZ: Europe/Bucharest  # Set timezone to Romania
+        TZ: Europe/Bucharest
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
         # Stage all CSV files
-        git add kicad_symbols_generator_clones_history.csv kicad_symbols_generator_visitors_history.csv minimal_adp1032_clones_history.csv minimal_adp1032_visitors_history.csv minimal_max14906_clones_history.csv minimal_max14906_visitors_history.csv minimal_ad74413r_clones_history.csv minimal_ad74413r_visitors_history.csv modular_software_configurable_io_plc_clones_history.csv modular_software_configurable_io_plc_visitors_history.csv minimal_adin1110_clones_history.csv minimal_adin1110_visitors_history.csv
+        echo "$REPOSITORIES" | jq -r '.repos[] | .prefix' | while read -r prefix; do
+          git add "${prefix}_clones_history.csv" "${prefix}_visitors_history.csv"
+        done
         
-        # Check if there are any changes to commit
+        # Commit and push if there are changes
         if [[ -n $(git status -s) ]]; then
           git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
           git pull --rebase origin main
@@ -425,104 +161,54 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout clones_monitor repository
+    - name: Checkout repositories
       uses: actions/checkout@v4
       with:
         repository: ionutms/clones_monitor
         path: clones_monitor
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
-    
-    - name: Checkout first repository
+
+    - name: Checkout main repository
       uses: actions/checkout@v4
       with:
         repository: ionutms/KiCAD_Symbols_Generator
-        path: repo1
+        path: main_repo
         token: ${{ secrets.TRAFIC_UPDATE_TOKEN }}
-    
+
     - name: Copy CSV files to repository
       run: |
-        # Create traffic data directory in first repository
-        mkdir -p repo1/repo_traffic_data
+        # Create traffic data directory
+        mkdir -p main_repo/repo_traffic_data
         
-        # Copy KiCAD_Symbols_Generator data
-        cp clones_monitor/kicad_symbols_generator_clones_history.csv repo1/repo_traffic_data/kicad_symbols_generator_clones_history.csv
-        cp clones_monitor/kicad_symbols_generator_visitors_history.csv repo1/repo_traffic_data/kicad_symbols_generator_visitors_history.csv
+        # Function to copy CSV files
+        copy_csv_files() {
+          local prefix=$1
+          local source_dir="clones_monitor"
+          local dest_dir="main_repo/repo_traffic_data"
+          
+          for type in clones visitors; do
+            local file="${prefix}_${type}_history.csv"
+            if [ -f "${source_dir}/${file}" ]; then
+              cp "${source_dir}/${file}" "${dest_dir}/${file}"
+            else
+              echo "Warning: ${file} not found in clones_monitor directory"
+            fi
+          done
+        }
         
-        # Copy ADP1032 data
-        if [ -f "clones_monitor/minimal_adp1032_clones_history.csv" ]; then
-            cp clones_monitor/minimal_adp1032_clones_history.csv repo1/repo_traffic_data/minimal_adp1032_clones_history.csv
-        else
-            echo "Warning: minimal_adp1032_clones_history.csv not found in clones_monitor directory"
-        fi
+        # Process each repository
+        echo "$REPOSITORIES" | jq -r '.repos[] | .prefix' | while read -r prefix; do
+          copy_csv_files "$prefix"
+        done
 
-        if [ -f "clones_monitor/minimal_adp1032_visitors_history.csv" ]; then
-            cp clones_monitor/minimal_adp1032_visitors_history.csv repo1/repo_traffic_data/minimal_adp1032_visitors_history.csv
-        else
-            echo "Warning: minimal_adp1032_visitors_history.csv not found in clones_monitor directory"
-        fi
-
-        # Copy MAX14906 data
-        if [ -f "clones_monitor/minimal_max14906_clones_history.csv" ]; then
-            cp clones_monitor/minimal_max14906_clones_history.csv repo1/repo_traffic_data/minimal_max14906_clones_history.csv
-        else
-            echo "Warning: minimal_max14906_clones_history.csv not found in clones_monitor directory"
-        fi
-
-        if [ -f "clones_monitor/minimal_max14906_visitors_history.csv" ]; then
-            cp clones_monitor/minimal_max14906_visitors_history.csv repo1/repo_traffic_data/minimal_max14906_visitors_history.csv
-        else
-            echo "Warning: minimal_max14906_visitors_history.csv not found in clones_monitor directory"
-        fi
-
-        # Copy AD74413R data
-        if [ -f "clones_monitor/minimal_ad74413r_clones_history.csv" ]; then
-            cp clones_monitor/minimal_ad74413r_clones_history.csv repo1/repo_traffic_data/minimal_ad74413r_clones_history.csv
-        else
-            echo "Warning: minimal_ad74413r_clones_history.csv not found in clones_monitor directory"
-        fi
-
-        if [ -f "clones_monitor/minimal_ad74413r_visitors_history.csv" ]; then
-            cp clones_monitor/minimal_ad74413r_visitors_history.csv repo1/repo_traffic_data/minimal_ad74413r_visitors_history.csv
-        else
-            echo "Warning: minimal_ad74413r_visitors_history.csv not found in clones_monitor directory"
-        fi
-
-        # Copy Modular_Software_Configurable_IO_PLC data
-        if [ -f "clones_monitor/modular_software_configurable_io_plc_clones_history.csv" ]; then
-            cp clones_monitor/modular_software_configurable_io_plc_clones_history.csv repo1/repo_traffic_data/modular_software_configurable_io_plc_clones_history.csv
-        else
-            echo "Warning: modular_software_configurable_io_plc_clones_history.csv not found in clones_monitor directory"
-        fi
-
-        if [ -f "clones_monitor/modular_software_configurable_io_plc_visitors_history.csv" ]; then
-            cp clones_monitor/modular_software_configurable_io_plc_visitors_history.csv repo1/repo_traffic_data/modular_software_configurable_io_plc_visitors_history.csv
-        else
-            echo "Warning: modular_software_configurable_io_plc_visitors_history.csv not found in clones_monitor directory"
-        fi
-
-        # Copy ADIN1110 data
-        if [ -f "clones_monitor/minimal_adin1110_clones_history.csv" ]; then
-            cp clones_monitor/minimal_adin1110_clones_history.csv repo1/repo_traffic_data/minimal_adin1110_clones_history.csv
-        else
-            echo "Warning: minimal_adin1110_clones_history.csv not found in clones_monitor directory"
-        fi
-
-        if [ -f "clones_monitor/minimal_adin1110_visitors_history.csv" ]; then
-            cp clones_monitor/minimal_adin1110_visitors_history.csv repo1/repo_traffic_data/minimal_adin1110_visitors_history.csv
-        else
-            echo "Warning: minimal_adin1110_visitors_history.csv not found in clones_monitor directory"
-        fi
-
-    - name: Commit and push traffic data to first repository
-      working-directory: repo1
+    - name: Commit and push traffic data to main repository
+      working-directory: main_repo
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         
-        # Stage all files in the repo_traffic_data directory
         git add -f repo_traffic_data/*
-
-        # Check if there are any changes to commit
+        
         if [[ -n $(git status -s repo_traffic_data) ]]; then
           git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
           git pull --rebase origin main
