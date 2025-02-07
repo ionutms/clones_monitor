@@ -1,4 +1,4 @@
-name: Monitor Repository Traffic
+name: Monitor Repository Clones and Update Traffic Data
 
 on:
   schedule:
@@ -24,63 +24,72 @@ jobs:
 
     - name: Initialize CSV files
       run: |
-        repos=(
-          "kicad_symbols_generator"
-          "minimal_adp1032"
-          "minimal_max14906"
-          "minimal_ad74413r"
-          "modular_software_configurable_io_plc"
-          "minimal_adin1110"
+        declare -A files=(
+          ["kicad_symbols_generator"]="KiCAD_Symbols_Generator"
+          ["minimal_adp1032"]="Minimal_ADP1032"
+          ["minimal_max14906"]="Minimal_MAX14906"
+          ["minimal_ad74413r"]="Minimal_AD74413R"
+          ["modular_software_configurable_io_plc"]="Modular_Software_Configurable_IO_PLC"
+          ["minimal_adin1110"]="Minimal_ADIN1110"
         )
         
-        for repo in "${repos[@]}"; do
-          for type in "clones" "visitors"; do
-            file="${repo}_${type}_history.csv"
-            if [ ! -f "$file" ]; then
-              echo "${type%s}_timestamp,total_${type},unique_${type}" > "$file"
-            fi
-          done
+        for file_prefix in "${!files[@]}"; do
+          # Initialize clones file
+          if [ ! -f "${file_prefix}_clones_history.csv" ]; then
+            echo "clone_timestamp,total_clones,unique_clones" > "${file_prefix}_clones_history.csv"
+          fi
+          
+          # Initialize visitors file
+          if [ ! -f "${file_prefix}_visitors_history.csv" ]; then
+            echo "visitor_timestamp,total_visitors,unique_visitors" > "${file_prefix}_visitors_history.csv"
+          fi
         done
 
     - name: Fetch traffic data
       run: |
         fetch_traffic() {
           local repo=$1
-          local type=$2
-          local file_prefix=$3
+          local output_prefix=$2
+          local type=$3
+          local endpoint="clones"
+          local output_type="clones"
           
-          gh api "repos/ionutms/$repo/traffic/$type?per_page=100&ref=main" | \
+          if [ "$type" = "visitors" ]; then
+            endpoint="views"
+            output_type="visitors"
+          fi
+          
+          gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main" | \
           jq -r "
-            .${type} |
+            .${endpoint} |
             map([
               (.timestamp | sub(\"T.*\";\"\") | sub(\"Z\$\";\"\")) ,
               .count,
               .uniques
             ] | @csv)[]
-          " >> "${file_prefix}_${type}_history.csv"
+          " >> "${output_prefix}_${output_type}_history.csv"
         }
         
-        repos=(
-          "KiCAD_Symbols_Generator:kicad_symbols_generator"
-          "Minimal_ADP1032:minimal_adp1032"
-          "Minimal_MAX14906:minimal_max14906"
-          "Minimal_AD74413R:minimal_ad74413r"
-          "Modular_Software_Configurable_IO_PLC:modular_software_configurable_io_plc"
-          "Minimal_ADIN1110:minimal_adin1110"
+        declare -A repos=(
+          ["kicad_symbols_generator"]="KiCAD_Symbols_Generator"
+          ["minimal_adp1032"]="Minimal_ADP1032"
+          ["minimal_max14906"]="Minimal_MAX14906"
+          ["minimal_ad74413r"]="Minimal_AD74413R"
+          ["modular_software_configurable_io_plc"]="Modular_Software_Configurable_IO_PLC"
+          ["minimal_adin1110"]="Minimal_ADIN1110"
         )
         
-        for repo_mapping in "${repos[@]}"; do
-          IFS=':' read -r repo_name file_prefix <<< "$repo_mapping"
-          fetch_traffic "$repo_name" "clones" "$file_prefix"
-          fetch_traffic "$repo_name" "views" "$file_prefix"
+        for output_prefix in "${!repos[@]}"; do
+          fetch_traffic "${repos[$output_prefix]}" "$output_prefix" "clones"
+          fetch_traffic "${repos[$output_prefix]}" "$output_prefix" "visitors"
         done
 
     - name: Remove duplicate rows
       run: |
         process_csv() {
           local input=$1
+          local header=$2
           local temp="${input%.csv}_fixed.csv"
-          local header=$(head -n1 "$input")
           
           echo "$header" > "$temp"
           awk -F, 'NR>1 { data[$1] = $0 } END { for(k in data) print data[k] }' "$input" | \
@@ -88,18 +97,22 @@ jobs:
           mv "$temp" "$input"
         }
         
-        for file in *_history.csv; do
-          process_csv "$file"
+        for csv in *_clones_history.csv; do
+          process_csv "$csv" "clone_timestamp,total_clones,unique_clones"
+        done
+        
+        for csv in *_visitors_history.csv; do
+          process_csv "$csv" "visitor_timestamp,total_visitors,unique_visitors"
         done
 
-    - name: Commit and push updates
+    - name: Commit and push traffic data
       run: |
         git config user.name 'GitHub Actions Bot'
         git config user.email '<>'
         git add *_history.csv
         
         if [[ -n $(git status -s) ]]; then
-          git commit -m "Update traffic statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
           git pull --rebase origin main
           git push origin main
         fi
@@ -125,7 +138,30 @@ jobs:
       run: |
         mkdir -p repo1/repo_traffic_data
         
-        find clones_monitor -name "*_history.csv" -exec cp {} repo1/repo_traffic_data/ \;
+        # List of all CSV files to copy
+        csv_files=(
+          "kicad_symbols_generator_clones_history.csv"
+          "kicad_symbols_generator_visitors_history.csv"
+          "minimal_adp1032_clones_history.csv"
+          "minimal_adp1032_visitors_history.csv"
+          "minimal_max14906_clones_history.csv"
+          "minimal_max14906_visitors_history.csv"
+          "minimal_ad74413r_clones_history.csv"
+          "minimal_ad74413r_visitors_history.csv"
+          "modular_software_configurable_io_plc_clones_history.csv"
+          "modular_software_configurable_io_plc_visitors_history.csv"
+          "minimal_adin1110_clones_history.csv"
+          "minimal_adin1110_visitors_history.csv"
+        )
+        
+        # Copy each file and check if it exists
+        for file in "${csv_files[@]}"; do
+          if [ -f "clones_monitor/$file" ]; then
+            cp "clones_monitor/$file" "repo1/repo_traffic_data/$file"
+          else
+            echo "Warning: $file not found in clones_monitor directory"
+          fi
+        done
         
         cd repo1
         git config user.name 'GitHub Actions Bot'
@@ -133,7 +169,7 @@ jobs:
         
         if [[ -n $(git status -s repo_traffic_data) ]]; then
           git add -f repo_traffic_data/
-          git commit -m "Update traffic statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
+          git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
           git pull --rebase origin main
           git push origin main
         fi
