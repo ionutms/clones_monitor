@@ -32,7 +32,6 @@ jobs:
           ["modular_software_configurable_io_plc"]="Modular_Software_Configurable_IO_PLC"
           ["minimal_adin1110"]="Minimal_ADIN1110"
           ["minimal_ltc9111"]="Minimal_LTC9111"
-          ["minimal_spoe_hybrid"]="Minimal_SPoE_Hybrid"
         )
         
         for file_prefix in "${!files[@]}"; do
@@ -80,7 +79,6 @@ jobs:
           ["modular_software_configurable_io_plc"]="Modular_Software_Configurable_IO_PLC"
           ["minimal_adin1110"]="Minimal_ADIN1110"
           ["minimal_ltc9111"]="Minimal_LTC9111"
-          ["minimal_spoe_hybrid"]="Minimal_SPoE_Hybrid"
         )
         
         for output_prefix in "${!repos[@]}"; do
@@ -158,8 +156,6 @@ jobs:
           "minimal_adin1110_visitors_history.csv"
           "minimal_ltc9111_clones_history.csv"
           "minimal_ltc9111_visitors_history.csv"
-          "minimal_spoe_hybrid_clones_history.csv"
-          "minimal_spoe_hybrid_visitors_history.csv"
         )
         
         # Copy each file and check if it exists
