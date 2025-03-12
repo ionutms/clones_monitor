@@ -34,6 +34,7 @@ jobs:
           ["minimal_ltc9111"]="Minimal_LTC9111"
           ["minimal_spoe_hybrid"]="Minimal_SPoE_Hybrid"
           ["minimal_max17761"]="Minimal_MAX17761"
+          ["minimal_lt8304"]="Minimal_LT8304"
         )
         
         for file_prefix in "${!files[@]}"; do
@@ -83,6 +84,7 @@ jobs:
           ["minimal_ltc9111"]="Minimal_LTC9111"
           ["minimal_spoe_hybrid"]="Minimal_SPoE_Hybrid"
           ["minimal_max17761"]="Minimal_MAX17761"
+          ["minimal_lt8304"]="Minimal_LT8304"
         )
         
         for output_prefix in "${!repos[@]}"; do
@@ -164,6 +166,8 @@ jobs:
           "minimal_spoe_hybrid_visitors_history.csv"
           "minimal_max17761_clones_history.csv"
           "minimal_max17761_visitors_history.csv"
+          "minimal_lt8304_clones_history.csv"
+          "minimal_lt8304_visitors_history.csv"
         )
         
         # Copy each file and check if it exists
