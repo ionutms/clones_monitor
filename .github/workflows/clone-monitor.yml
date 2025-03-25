@@ -36,6 +36,7 @@ jobs:
           ["minimal_max17761"]="Minimal_MAX17761"
           ["minimal_lt8304"]="Minimal_LT8304"
           ["3d_models_vault"]="3D_Models_Vault"
+          ["minimal_max32650"]="Minimal_MAX32650"
           
         )
         
@@ -88,6 +89,7 @@ jobs:
           ["minimal_max17761"]="Minimal_MAX17761"
           ["minimal_lt8304"]="Minimal_LT8304"
           ["3d_models_vault"]="3D_Models_Vault"
+          ["minimal_max32650"]="Minimal_MAX32650"
         )
         
         for output_prefix in "${!repos[@]}"; do
@@ -173,6 +175,8 @@ jobs:
           "minimal_lt8304_visitors_history.csv"
           "3d_models_vault_clones_history.csv"
           "3d_models_vault_visitors_history.csv"
+          "minimal_max32650_clones_history.csv"
+          "minimal_max32650_visitors_history.csv"
         )
         
         # Copy each file and check if it exists
