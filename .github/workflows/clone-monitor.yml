@@ -37,7 +37,6 @@ jobs:
           ["3d_models_vault"]="3D_Models_Vault"
           ["minimal_max32650"]="Minimal_MAX32650"
           ["docker_kicad_learning"]="docker_kicad_learning"
-          
         )
         
         for file_prefix in "${!files[@]}"; do
@@ -52,29 +51,53 @@ jobs:
           fi
         done
 
-    - name: Fetch traffic data
+    - name: Fetch current date traffic data
       run: |
-        fetch_traffic() {
+        fetch_current_traffic() {
           local repo=$1
           local output_prefix=$2
           local type=$3
           local endpoint="clones"
           local output_type="clones"
+          local current_date=$(date +"%Y-%m-%d")
           
           if [ "$type" = "visitors" ]; then
             endpoint="views"
             output_type="visitors"
           fi
           
-          gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main" | \
+          # Get today's data
+          today_data=$(gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main" | \
           jq -r "
             .${endpoint} |
+            map(select(.timestamp | startswith(\"$current_date\"))) |
             map([
               (.timestamp | sub(\"T.*\";\"\") | sub(\"Z\$\";\"\")) ,
               .count,
               .uniques
             ] | @csv)[]
-          " >> "${output_prefix}_${output_type}_history.csv"
+          ")
+          
+          # If we have data for today, process it
+          if [ ! -z "$today_data" ]; then
+            # First create a temporary file with current data excluding today's entries
+            grep -v "^$current_date" "${output_prefix}_${output_type}_history.csv" > "${output_prefix}_${output_type}_temp.csv" || touch "${output_prefix}_${output_type}_temp.csv"
+            
+            # Add header if the temp file is empty
+            if [ ! -s "${output_prefix}_${output_type}_temp.csv" ]; then
+              if [ "$type" = "visitors" ]; then
+                echo "visitor_timestamp,total_visitors,unique_visitors" > "${output_prefix}_${output_type}_temp.csv"
+              else
+                echo "clone_timestamp,total_clones,unique_clones" > "${output_prefix}_${output_type}_temp.csv"
+              fi
+            fi
+            
+            # Append today's data
+            echo "$today_data" >> "${output_prefix}_${output_type}_temp.csv"
+            
+            # Replace original file with updated one
+            mv "${output_prefix}_${output_type}_temp.csv" "${output_prefix}_${output_type}_history.csv"
+          fi
         }
         
         declare -A repos=(
@@ -93,8 +116,8 @@ jobs:
         )
         
         for output_prefix in "${!repos[@]}"; do
-          fetch_traffic "${repos[$output_prefix]}" "$output_prefix" "clones"
-          fetch_traffic "${repos[$output_prefix]}" "$output_prefix" "visitors"
+          fetch_current_traffic "${repos[$output_prefix]}" "$output_prefix" "clones"
+          fetch_current_traffic "${repos[$output_prefix]}" "$output_prefix" "visitors"
         done
 
     - name: Remove duplicate rows
