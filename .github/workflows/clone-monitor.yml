@@ -66,6 +66,17 @@ jobs:
             output_type="visitors"
           fi
           
+          echo "Processing $type data for $repo (${output_prefix})..."
+          
+          # Check if we have existing data for today
+          local old_data=""
+          if grep -q "^$current_date" "${output_prefix}_${output_type}_history.csv"; then
+            old_data=$(grep "^$current_date" "${output_prefix}_${output_type}_history.csv")
+            echo "  Found existing data for today: $old_data"
+          else
+            echo "  No existing data found for today"
+          fi
+          
           # Get today's data
           today_data=$(gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main" | \
           jq -r "
@@ -80,6 +91,25 @@ jobs:
           
           # If we have data for today, process it
           if [ ! -z "$today_data" ]; then
+            echo "  New data for today: $today_data"
+            
+            # Calculate differences if we had old data
+            if [ ! -z "$old_data" ]; then
+              local old_total=$(echo "$old_data" | cut -d',' -f2)
+              local old_unique=$(echo "$old_data" | cut -d',' -f3)
+              local new_total=$(echo "$today_data" | cut -d',' -f2)
+              local new_unique=$(echo "$today_data" | cut -d',' -f3)
+              
+              local diff_total=$((new_total - old_total))
+              local diff_unique=$((new_unique - old_unique))
+              
+              echo "  Changes since last update:"
+              echo "    Total $output_type: $old_total → $new_total ($([ $diff_total -ge 0 ] && echo "+$diff_total" || echo "$diff_total"))"
+              echo "    Unique $output_type: $old_unique → $new_unique ($([ $diff_unique -ge 0 ] && echo "+$diff_unique" || echo "$diff_unique"))"
+            else
+              echo "  First data for today: Total=$new_total, Unique=$new_unique"
+            fi
+            
             # First create a temporary file with current data excluding today's entries
             grep -v "^$current_date" "${output_prefix}_${output_type}_history.csv" > "${output_prefix}_${output_type}_temp.csv" || touch "${output_prefix}_${output_type}_temp.csv"
             
@@ -97,7 +127,11 @@ jobs:
             
             # Replace original file with updated one
             mv "${output_prefix}_${output_type}_temp.csv" "${output_prefix}_${output_type}_history.csv"
+            echo "  Updated ${output_prefix}_${output_type}_history.csv successfully"
+          else
+            echo "  No data available for today from GitHub API"
           fi
+          echo ""
         }
         
         declare -A repos=(
@@ -148,9 +182,45 @@ jobs:
         git add *_history.csv
         
         if [[ -n $(git status -s) ]]; then
-          git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          echo "Changes detected in traffic data files:"
+          git diff --staged --stat
+          
+          # Generate a summary of today's data for commit message
+          current_date=$(date +"%Y-%m-%d")
+          echo "Generating summary for commit message..."
+          
+          summary=""
+          for repo_type in clones visitors; do
+            for csv_file in *_${repo_type}_history.csv; do
+              if grep -q "^$current_date" "$csv_file"; then
+                repo_name=$(echo "$csv_file" | sed "s/_${repo_type}_history.csv//")
+                data_line=$(grep "^$current_date" "$csv_file")
+                
+                if [ "$repo_type" = "clones" ]; then
+                  total=$(echo "$data_line" | cut -d',' -f2)
+                  unique=$(echo "$data_line" | cut -d',' -f3)
+                  summary="$summary\n- $repo_name: $total clones ($unique unique)"
+                else
+                  total=$(echo "$data_line" | cut -d',' -f2)
+                  unique=$(echo "$data_line" | cut -d',' -f3)
+                  summary="$summary\n- $repo_name: $total views ($unique unique visitors)"
+                fi
+              fi
+            done
+          done
+          
+          if [ ! -z "$summary" ]; then
+            commit_msg="Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")\n\nToday's data:$summary"
+            git commit -m "$(echo -e "$commit_msg")"
+          else
+            git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
+          fi
+          
           git pull --rebase origin main
           git push origin main
+          echo "Successfully pushed updated traffic data"
+        else
+          echo "No changes detected in traffic data files"
         fi
 
   update-repo-traffic:
