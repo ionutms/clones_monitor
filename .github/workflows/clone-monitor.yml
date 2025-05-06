@@ -51,15 +51,18 @@ jobs:
           fi
         done
 
-    - name: Fetch current date traffic data
+    - name: Fetch traffic data for last 2 days
       run: |
-        fetch_current_traffic() {
+        fetch_traffic_data() {
           local repo=$1
           local output_prefix=$2
           local type=$3
           local endpoint="clones"
           local output_type="clones"
+          
+          # Get today and yesterday dates
           local current_date=$(date +"%Y-%m-%d")
+          local yesterday_date=$(date -d "yesterday" +"%Y-%m-%d")
           
           if [ "$type" = "visitors" ]; then
             endpoint="views"
@@ -68,69 +71,89 @@ jobs:
           
           echo "Processing $type data for $repo (${output_prefix})..."
           
-          # Check if we have existing data for today
-          local old_data=""
-          if grep -q "^$current_date" "${output_prefix}_${output_type}_history.csv"; then
-            old_data=$(grep "^$current_date" "${output_prefix}_${output_type}_history.csv")
-            echo "  Found existing data for today: $old_data"
-          else
-            echo "  No existing data found for today"
+          # Get data from the GitHub API (includes 14 days by default)
+          traffic_data=$(gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main")
+          
+          # Check if we have any data
+          if [ -z "$traffic_data" ]; then
+            echo "  No data available from GitHub API"
+            return
           fi
           
-          # Get today's data
-          today_data=$(gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main" | \
-          jq -r "
-            .${endpoint} |
-            map(select(.timestamp | startswith(\"$current_date\"))) |
-            map([
-              (.timestamp | sub(\"T.*\";\"\") | sub(\"Z\$\";\"\")) ,
-              .count,
-              .uniques
-            ] | @csv)[]
-          ")
-          
-          # If we have data for today, process it
-          if [ ! -z "$today_data" ]; then
-            echo "  New data for today: $today_data"
+          # Process data for today and yesterday
+          for target_date in "$current_date" "$yesterday_date"; do
+            echo "  Processing data for $target_date..."
             
-            # Calculate differences if we had old data
-            if [ ! -z "$old_data" ]; then
-              local old_total=$(echo "$old_data" | cut -d',' -f2)
-              local old_unique=$(echo "$old_data" | cut -d',' -f3)
-              local new_total=$(echo "$today_data" | cut -d',' -f2)
-              local new_unique=$(echo "$today_data" | cut -d',' -f3)
-              
-              local diff_total=$((new_total - old_total))
-              local diff_unique=$((new_unique - old_unique))
-              
-              echo "  Changes since last update:"
-              echo "    Total $output_type: $old_total → $new_total ($([ $diff_total -ge 0 ] && echo "+$diff_total" || echo "$diff_total"))"
-              echo "    Unique $output_type: $old_unique → $new_unique ($([ $diff_unique -ge 0 ] && echo "+$diff_unique" || echo "$diff_unique"))"
+            # Check if we have existing data for the target date
+            local old_data=""
+            if grep -q "^$target_date" "${output_prefix}_${output_type}_history.csv"; then
+              old_data=$(grep "^$target_date" "${output_prefix}_${output_type}_history.csv")
+              echo "    Found existing data for $target_date: $old_data"
             else
-              echo "  First data for today: Total=$new_total, Unique=$new_unique"
+              echo "    No existing data found for $target_date"
             fi
             
-            # First create a temporary file with current data excluding today's entries
-            grep -v "^$current_date" "${output_prefix}_${output_type}_history.csv" > "${output_prefix}_${output_type}_temp.csv" || touch "${output_prefix}_${output_type}_temp.csv"
+            # Extract data for the target date from API response
+            day_data=$(echo "$traffic_data" | \
+            jq -r "
+              .${endpoint} |
+              map(select(.timestamp | startswith(\"$target_date\"))) |
+              map([
+                (.timestamp | sub(\"T.*\";\"\") | sub(\"Z\$\";\"\")) ,
+                .count,
+                .uniques
+              ] | @csv)[]
+            ")
             
-            # Add header if the temp file is empty
-            if [ ! -s "${output_prefix}_${output_type}_temp.csv" ]; then
-              if [ "$type" = "visitors" ]; then
-                echo "visitor_timestamp,total_visitors,unique_visitors" > "${output_prefix}_${output_type}_temp.csv"
+            # If we have data for the target date, process it
+            if [ ! -z "$day_data" ]; then
+              echo "    New data for $target_date: $day_data"
+              
+              # Calculate differences if we had old data
+              if [ ! -z "$old_data" ]; then
+                local old_total=$(echo "$old_data" | cut -d',' -f2)
+                local old_unique=$(echo "$old_data" | cut -d',' -f3)
+                local new_total=$(echo "$day_data" | cut -d',' -f2)
+                local new_unique=$(echo "$day_data" | cut -d',' -f3)
+                
+                # Only update if new values are higher (to avoid losing data)
+                if (( new_total >= old_total && new_unique >= old_unique )); then
+                  local diff_total=$((new_total - old_total))
+                  local diff_unique=$((new_unique - old_unique))
+                  
+                  echo "    Changes to update:"
+                  echo "      Total $output_type: $old_total → $new_total ($([ $diff_total -ge 0 ] && echo "+$diff_total" || echo "$diff_total"))"
+                  echo "      Unique $output_type: $old_unique → $new_unique ($([ $diff_unique -ge 0 ] && echo "+$diff_unique" || echo "$diff_unique"))"
+                else
+                  echo "    Keeping existing data as it has higher values"
+                  day_data="$old_data"
+                fi
               else
-                echo "clone_timestamp,total_clones,unique_clones" > "${output_prefix}_${output_type}_temp.csv"
+                echo "    First data for $target_date: $(echo $day_data | tr ',' ' ')"
               fi
+              
+              # First create a temporary file with current data excluding target date entries
+              grep -v "^$target_date" "${output_prefix}_${output_type}_history.csv" > "${output_prefix}_${output_type}_temp.csv" || touch "${output_prefix}_${output_type}_temp.csv"
+              
+              # Add header if the temp file is empty
+              if [ ! -s "${output_prefix}_${output_type}_temp.csv" ]; then
+                if [ "$type" = "visitors" ]; then
+                  echo "visitor_timestamp,total_visitors,unique_visitors" > "${output_prefix}_${output_type}_temp.csv"
+                else
+                  echo "clone_timestamp,total_clones,unique_clones" > "${output_prefix}_${output_type}_temp.csv"
+                fi
+              fi
+              
+              # Append target date data
+              echo "$day_data" >> "${output_prefix}_${output_type}_temp.csv"
+              
+              # Replace original file with updated one
+              mv "${output_prefix}_${output_type}_temp.csv" "${output_prefix}_${output_type}_history.csv"
+              echo "    Updated ${output_prefix}_${output_type}_history.csv with $target_date data"
+            else
+              echo "    No data available for $target_date from GitHub API"
             fi
-            
-            # Append today's data
-            echo "$today_data" >> "${output_prefix}_${output_type}_temp.csv"
-            
-            # Replace original file with updated one
-            mv "${output_prefix}_${output_type}_temp.csv" "${output_prefix}_${output_type}_history.csv"
-            echo "  Updated ${output_prefix}_${output_type}_history.csv successfully"
-          else
-            echo "  No data available for today from GitHub API"
-          fi
+          done
           echo ""
         }
         
@@ -150,8 +173,8 @@ jobs:
         )
         
         for output_prefix in "${!repos[@]}"; do
-          fetch_current_traffic "${repos[$output_prefix]}" "$output_prefix" "clones"
-          fetch_current_traffic "${repos[$output_prefix]}" "$output_prefix" "visitors"
+          fetch_traffic_data "${repos[$output_prefix]}" "$output_prefix" "clones"
+          fetch_traffic_data "${repos[$output_prefix]}" "$output_prefix" "visitors"
         done
 
     - name: Remove duplicate rows
@@ -185,32 +208,37 @@ jobs:
           echo "Changes detected in traffic data files:"
           git diff --staged --stat
           
-          # Generate a summary of today's data for commit message
+          # Generate a summary of both today's and yesterday's data for commit message
           current_date=$(date +"%Y-%m-%d")
+          yesterday_date=$(date -d "yesterday" +"%Y-%m-%d")
           echo "Generating summary for commit message..."
           
           summary=""
-          for repo_type in clones visitors; do
-            for csv_file in *_${repo_type}_history.csv; do
-              if grep -q "^$current_date" "$csv_file"; then
-                repo_name=$(echo "$csv_file" | sed "s/_${repo_type}_history.csv//")
-                data_line=$(grep "^$current_date" "$csv_file")
-                
-                if [ "$repo_type" = "clones" ]; then
-                  total=$(echo "$data_line" | cut -d',' -f2)
-                  unique=$(echo "$data_line" | cut -d',' -f3)
-                  summary="$summary\n- $repo_name: $total clones ($unique unique)"
-                else
-                  total=$(echo "$data_line" | cut -d',' -f2)
-                  unique=$(echo "$data_line" | cut -d',' -f3)
-                  summary="$summary\n- $repo_name: $total views ($unique unique visitors)"
+          for date in "$current_date" "$yesterday_date"; do
+            for repo_type in clones visitors; do
+              for csv_file in *_${repo_type}_history.csv; do
+                if grep -q "^$date" "$csv_file"; then
+                  repo_name=$(echo "$csv_file" | sed "s/_${repo_type}_history.csv//")
+                  data_line=$(grep "^$date" "$csv_file")
+                  
+                  date_label=$([ "$date" = "$current_date" ] && echo "Today" || echo "Yesterday")
+                  
+                  if [ "$repo_type" = "clones" ]; then
+                    total=$(echo "$data_line" | cut -d',' -f2)
+                    unique=$(echo "$data_line" | cut -d',' -f3)
+                    summary="$summary\n- $repo_name ($date_label): $total clones ($unique unique)"
+                  else
+                    total=$(echo "$data_line" | cut -d',' -f2)
+                    unique=$(echo "$data_line" | cut -d',' -f3)
+                    summary="$summary\n- $repo_name ($date_label): $total views ($unique unique visitors)"
+                  fi
                 fi
-              fi
+              done
             done
           done
           
           if [ ! -z "$summary" ]; then
-            commit_msg="Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")\n\nToday's data:$summary"
+            commit_msg="Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")\n\nLast 2 days data:$summary"
             git commit -m "$(echo -e "$commit_msg")"
           else
             git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
