@@ -37,6 +37,7 @@ jobs:
           ["3d_models_vault"]="3D_Models_Vault"
           ["minimal_max32650"]="Minimal_MAX32650"
           ["docker_kicad_learning"]="docker_kicad_learning"
+          ["Docker_3D_Models_Hosting"]="docker_3d_models_hosting"
         )
         
         for file_prefix in "${!files[@]}"; do
@@ -170,6 +171,7 @@ jobs:
           ["3d_models_vault"]="3D_Models_Vault"
           ["minimal_max32650"]="Minimal_MAX32650"
           ["docker_kicad_learning"]="docker_kicad_learning"
+          ["Docker_3D_Models_Hosting"]="docker_3d_models_hosting"
         )
         
         for output_prefix in "${!repos[@]}"; do
@@ -298,6 +300,8 @@ jobs:
           "minimal_max32650_visitors_history.csv"
           "docker_kicad_learning_clones_history.csv"
           "docker_kicad_learning_visitors_history.csv"
+          "docker_3d_models_hosting_clones_history.csv"
+          "docker_3d_models_hosting_visitors_history.csv"
         )
         
         # Copy each file and check if it exists
