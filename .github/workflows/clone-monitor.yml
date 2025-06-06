@@ -8,6 +8,25 @@ on:
   push:
     branches: [main]
 
+# Centralized repository configuration - ADD NEW PROJECTS HERE ONLY
+env:
+  # Repository mapping: prefix=Repository_Name (separated by spaces)
+  REPO_CONFIG: |
+    kicad_symbols_generator=KiCAD_Symbols_Generator
+    minimal_adp1032=Minimal_ADP1032
+    minimal_max14906=Minimal_MAX14906
+    minimal_ad74413r=Minimal_AD74413R
+    modular_software_configurable_io_plc=Modular_Software_Configurable_IO_PLC
+    minimal_adin1110=Minimal_ADIN1110
+    minimal_ltc9111=Minimal_LTC9111
+    minimal_max17761=Minimal_MAX17761
+    minimal_lt8304=Minimal_LT8304
+    3d_models_vault=3D_Models_Vault
+    minimal_max32650=Minimal_MAX32650
+    docker_kicad_learning=docker_kicad_learning
+    docker_3d_models_hosting=Docker_3D_Models_Hosting
+    clones_monitor=clones_monitor
+
 jobs:
   monitor-traffic:
     runs-on: ubuntu-latest
@@ -24,22 +43,13 @@ jobs:
 
     - name: Initialize CSV files
       run: |
-        declare -A files=(
-          ["kicad_symbols_generator"]="KiCAD_Symbols_Generator"
-          ["minimal_adp1032"]="Minimal_ADP1032"
-          ["minimal_max14906"]="Minimal_MAX14906"
-          ["minimal_ad74413r"]="Minimal_AD74413R"
-          ["modular_software_configurable_io_plc"]="Modular_Software_Configurable_IO_PLC"
-          ["minimal_adin1110"]="Minimal_ADIN1110"
-          ["minimal_ltc9111"]="Minimal_LTC9111"
-          ["minimal_max17761"]="Minimal_MAX17761"
-          ["minimal_lt8304"]="Minimal_LT8304"
-          ["3d_models_vault"]="3D_Models_Vault"
-          ["minimal_max32650"]="Minimal_MAX32650"
-          ["docker_kicad_learning"]="docker_kicad_learning"
-          ["docker_3d_models_hosting"]="Docker_3D_Models_Hosting"
-          ["clones_monitor"]="clones_monitor"
-        )
+        # Parse centralized configuration
+        declare -A files=()
+        while IFS='=' read -r prefix repo_name; do
+          if [[ -n "$prefix" && -n "$repo_name" ]]; then
+            files["$prefix"]="$repo_name"
+          fi
+        done <<< "$REPO_CONFIG"
         
         for file_prefix in "${!files[@]}"; do
           # Initialize clones file
@@ -159,22 +169,13 @@ jobs:
           echo ""
         }
         
-        declare -A repos=(
-          ["kicad_symbols_generator"]="KiCAD_Symbols_Generator"
-          ["minimal_adp1032"]="Minimal_ADP1032"
-          ["minimal_max14906"]="Minimal_MAX14906"
-          ["minimal_ad74413r"]="Minimal_AD74413R"
-          ["modular_software_configurable_io_plc"]="Modular_Software_Configurable_IO_PLC"
-          ["minimal_adin1110"]="Minimal_ADIN1110"
-          ["minimal_ltc9111"]="Minimal_LTC9111"
-          ["minimal_max17761"]="Minimal_MAX17761"
-          ["minimal_lt8304"]="Minimal_LT8304"
-          ["3d_models_vault"]="3D_Models_Vault"
-          ["minimal_max32650"]="Minimal_MAX32650"
-          ["docker_kicad_learning"]="docker_kicad_learning"
-          ["docker_3d_models_hosting"]="Docker_3D_Models_Hosting"
-          ["clones_monitor"]="clones_monitor"
-        )
+        # Parse centralized configuration
+        declare -A repos=()
+        while IFS='=' read -r prefix repo_name; do
+          if [[ -n "$prefix" && -n "$repo_name" ]]; then
+            repos["$prefix"]="$repo_name"
+          fi
+        done <<< "$REPO_CONFIG"
         
         for output_prefix in "${!repos[@]}"; do
           fetch_traffic_data "${repos[$output_prefix]}" "$output_prefix" "clones"
@@ -276,37 +277,14 @@ jobs:
       run: |
         mkdir -p repo1/repo_traffic_data
         
-        # List of all CSV files to copy
-        csv_files=(
-          "kicad_symbols_generator_clones_history.csv"
-          "kicad_symbols_generator_visitors_history.csv"
-          "minimal_adp1032_clones_history.csv"
-          "minimal_adp1032_visitors_history.csv"
-          "minimal_max14906_clones_history.csv"
-          "minimal_max14906_visitors_history.csv"
-          "minimal_ad74413r_clones_history.csv"
-          "minimal_ad74413r_visitors_history.csv"
-          "modular_software_configurable_io_plc_clones_history.csv"
-          "modular_software_configurable_io_plc_visitors_history.csv"
-          "minimal_adin1110_clones_history.csv"
-          "minimal_adin1110_visitors_history.csv"
-          "minimal_ltc9111_clones_history.csv"
-          "minimal_ltc9111_visitors_history.csv"
-          "minimal_max17761_clones_history.csv"
-          "minimal_max17761_visitors_history.csv"
-          "minimal_lt8304_clones_history.csv"
-          "minimal_lt8304_visitors_history.csv"
-          "3d_models_vault_clones_history.csv"
-          "3d_models_vault_visitors_history.csv"
-          "minimal_max32650_clones_history.csv"
-          "minimal_max32650_visitors_history.csv"
-          "docker_kicad_learning_clones_history.csv"
-          "docker_kicad_learning_visitors_history.csv"
-          "docker_3d_models_hosting_clones_history.csv"
-          "docker_3d_models_hosting_visitors_history.csv"
-          "clones_monitor_clones_history.csv"
-          "clones_monitor_visitors_history.csv"
-        )
+        # Generate CSV file list dynamically from centralized configuration
+        csv_files=()
+        while IFS='=' read -r prefix repo_name; do
+          if [[ -n "$prefix" && -n "$repo_name" ]]; then
+            csv_files+=("${prefix}_clones_history.csv")
+            csv_files+=("${prefix}_visitors_history.csv")
+          fi
+        done <<< "$REPO_CONFIG"
         
         # Copy each file and check if it exists
         for file in "${csv_files[@]}"; do
