@@ -5,6 +5,17 @@ on:
     - cron: '0 */2 * * *'
     - cron: '5 */2 * * *'
   workflow_dispatch:
+    inputs:
+      days_to_collect:
+        description: 'Number of days to collect (1-14, default: 2)'
+        required: false
+        default: '2'
+        type: string
+      force_full_sync:
+        description: 'Force full 14-day sync (ignores days_to_collect)'
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
 
@@ -26,6 +37,8 @@ env:
     docker_kicad_learning=docker_kicad_learning
     docker_3d_models_hosting=Docker_3D_Models_Hosting
     clones_monitor=clones_monitor
+  # Default number of days to collect (can be overridden by workflow_dispatch)
+  DEFAULT_DAYS_TO_COLLECT: '2'
 
 jobs:
   monitor-traffic:
@@ -40,6 +53,32 @@ jobs:
         fetch-depth: 0
     
     - uses: sersoft-gmbh/setup-gh-cli-action@v2.0.1
+
+    - name: Set collection parameters
+      run: |
+        # Determine how many days to collect
+        if [ "${{ github.event.inputs.force_full_sync }}" = "true" ]; then
+          DAYS_TO_COLLECT=14
+          echo "COLLECTION_MODE=full_sync" >> $GITHUB_ENV
+        elif [ -n "${{ github.event.inputs.days_to_collect }}" ]; then
+          DAYS_TO_COLLECT="${{ github.event.inputs.days_to_collect }}"
+          echo "COLLECTION_MODE=manual" >> $GITHUB_ENV
+        else
+          DAYS_TO_COLLECT="${{ env.DEFAULT_DAYS_TO_COLLECT }}"
+          echo "COLLECTION_MODE=scheduled" >> $GITHUB_ENV
+        fi
+        
+        # Validate days range (GitHub API provides max 14 days)
+        if [ "$DAYS_TO_COLLECT" -gt 14 ]; then
+          echo "Warning: GitHub API only provides 14 days of data. Setting to 14."
+          DAYS_TO_COLLECT=14
+        elif [ "$DAYS_TO_COLLECT" -lt 1 ]; then
+          echo "Warning: Days to collect must be at least 1. Setting to 1."
+          DAYS_TO_COLLECT=1
+        fi
+        
+        echo "DAYS_TO_COLLECT=$DAYS_TO_COLLECT" >> $GITHUB_ENV
+        echo "Will collect data for the last $DAYS_TO_COLLECT days (mode: $COLLECTION_MODE)"
 
     - name: Initialize CSV files
       run: |
@@ -63,7 +102,7 @@ jobs:
           fi
         done
 
-    - name: Fetch traffic data for last 2 days
+    - name: Fetch traffic data for multiple days
       run: |
         fetch_traffic_data() {
           local repo=$1
@@ -72,18 +111,14 @@ jobs:
           local endpoint="clones"
           local output_type="clones"
           
-          # Get today and yesterday dates
-          local current_date=$(date +"%Y-%m-%d")
-          local yesterday_date=$(date -d "yesterday" +"%Y-%m-%d")
-          
           if [ "$type" = "visitors" ]; then
             endpoint="views"
             output_type="visitors"
           fi
           
-          echo "Processing $type data for $repo (${output_prefix})..."
+          echo "Processing $type data for $repo (${output_prefix}) - Last $DAYS_TO_COLLECT days..."
           
-          # Get data from the GitHub API (includes 14 days by default)
+          # Get data from the GitHub API (includes up to 14 days)
           traffic_data=$(gh api "repos/ionutms/$repo/traffic/$endpoint?per_page=100&ref=main")
           
           # Check if we have any data
@@ -92,8 +127,17 @@ jobs:
             return
           fi
           
-          # Process data for today and yesterday
-          for target_date in "$current_date" "$yesterday_date"; do
+          # Generate list of dates to process
+          dates_to_process=()
+          for ((i=0; i<DAYS_TO_COLLECT; i++)); do
+            date_str=$(date -d "$i days ago" +"%Y-%m-%d")
+            dates_to_process+=("$date_str")
+          done
+          
+          echo "  Dates to process: ${dates_to_process[*]}"
+          
+          # Process data for each target date
+          for target_date in "${dates_to_process[@]}"; do
             echo "  Processing data for $target_date..."
             
             # Check if we have existing data for the target date
@@ -128,11 +172,17 @@ jobs:
                 local new_total=$(echo "$day_data" | cut -d',' -f2)
                 local new_unique=$(echo "$day_data" | cut -d',' -f3)
                 
-                # Only update if new values are higher (to avoid losing data)
-                if (( new_total >= old_total && new_unique >= old_unique )); then
+                # Determine update strategy based on collection mode
+                local should_update=false
+                if [ "$COLLECTION_MODE" = "full_sync" ]; then
+                  # In full sync mode, always update with API data
+                  should_update=true
+                  echo "    Full sync mode: updating with API data"
+                elif (( new_total >= old_total && new_unique >= old_unique )); then
+                  # In normal mode, only update if new values are higher
+                  should_update=true
                   local diff_total=$((new_total - old_total))
                   local diff_unique=$((new_unique - old_unique))
-                  
                   echo "    Changes to update:"
                   echo "      Total $output_type: $old_total → $new_total ($([ $diff_total -ge 0 ] && echo "+$diff_total" || echo "$diff_total"))"
                   echo "      Unique $output_type: $old_unique → $new_unique ($([ $diff_unique -ge 0 ] && echo "+$diff_unique" || echo "$diff_unique"))"
@@ -144,6 +194,7 @@ jobs:
                 echo "    First data for $target_date: $(echo $day_data | tr ',' ' ')"
               fi
               
+              # Update the CSV file
               # First create a temporary file with current data excluding target date entries
               grep -v "^$target_date" "${output_prefix}_${output_type}_history.csv" > "${output_prefix}_${output_type}_temp.csv" || touch "${output_prefix}_${output_type}_temp.csv"
               
@@ -182,7 +233,7 @@ jobs:
           fetch_traffic_data "${repos[$output_prefix]}" "$output_prefix" "visitors"
         done
 
-    - name: Remove duplicate rows
+    - name: Remove duplicate rows and sort by date
       run: |
         process_csv() {
           local input=$1
@@ -190,6 +241,7 @@ jobs:
           local temp="${input%.csv}_fixed.csv"
           
           echo "$header" > "$temp"
+          # Remove duplicates by date and sort chronologically (oldest first - matches original behavior)
           awk -F, 'NR>1 { data[$1] = $0 } END { for(k in data) print data[k] }' "$input" | \
             sort -t, -k1 >> "$temp"
           mv "$temp" "$input"
@@ -203,6 +255,46 @@ jobs:
           process_csv "$csv" "visitor_timestamp,total_visitors,unique_visitors"
         done
 
+    - name: Generate collection summary
+      run: |
+        echo "=== TRAFFIC DATA COLLECTION SUMMARY ==="
+        echo "Collection mode: $COLLECTION_MODE"
+        echo "Days collected: $DAYS_TO_COLLECT"
+        echo "Timestamp: $(date +"%Y-%m-%d %H:%M:%S %Z")"
+        echo ""
+        
+        # Generate summary for each repository
+        declare -A repos=()
+        while IFS='=' read -r prefix repo_name; do
+          if [[ -n "$prefix" && -n "$repo_name" ]]; then
+            repos["$prefix"]="$repo_name"
+          fi
+        done <<< "$REPO_CONFIG"
+        
+        for output_prefix in "${!repos[@]}"; do
+          repo_name="${repos[$output_prefix]}"
+          echo "Repository: $repo_name"
+          
+          # Show clones data (last few entries since data is sorted oldest first)
+          if [ -f "${output_prefix}_clones_history.csv" ]; then
+            echo "  Recent Clones:"
+            tail -n $DAYS_TO_COLLECT "${output_prefix}_clones_history.csv" | \
+            while IFS=',' read -r date total unique; do
+              echo "    $date: $total total ($unique unique)"
+            done
+          fi
+          
+          # Show visitors data (last few entries since data is sorted oldest first)
+          if [ -f "${output_prefix}_visitors_history.csv" ]; then
+            echo "  Recent Visitors:"
+            tail -n $DAYS_TO_COLLECT "${output_prefix}_visitors_history.csv" | \
+            while IFS=',' read -r date total unique; do
+              echo "    $date: $total views ($unique unique visitors)"
+            done
+          fi
+          echo ""
+        done
+
     - name: Commit and push traffic data
       run: |
         git config user.name 'GitHub Actions Bot'
@@ -213,42 +305,16 @@ jobs:
           echo "Changes detected in traffic data files:"
           git diff --staged --stat
           
-          # Generate a summary of both today's and yesterday's data for commit message
-          current_date=$(date +"%Y-%m-%d")
-          yesterday_date=$(date -d "yesterday" +"%Y-%m-%d")
-          echo "Generating summary for commit message..."
-          
-          summary=""
-          for date in "$current_date" "$yesterday_date"; do
-            for repo_type in clones visitors; do
-              for csv_file in *_${repo_type}_history.csv; do
-                if grep -q "^$date" "$csv_file"; then
-                  repo_name=$(echo "$csv_file" | sed "s/_${repo_type}_history.csv//")
-                  data_line=$(grep "^$date" "$csv_file")
-                  
-                  date_label=$([ "$date" = "$current_date" ] && echo "Today" || echo "Yesterday")
-                  
-                  if [ "$repo_type" = "clones" ]; then
-                    total=$(echo "$data_line" | cut -d',' -f2)
-                    unique=$(echo "$data_line" | cut -d',' -f3)
-                    summary="$summary\n- $repo_name ($date_label): $total clones ($unique unique)"
-                  else
-                    total=$(echo "$data_line" | cut -d',' -f2)
-                    unique=$(echo "$data_line" | cut -d',' -f3)
-                    summary="$summary\n- $repo_name ($date_label): $total views ($unique unique visitors)"
-                  fi
-                fi
-              done
-            done
-          done
-          
-          if [ ! -z "$summary" ]; then
-            commit_msg="Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")\n\nLast 2 days data:$summary"
-            git commit -m "$(echo -e "$commit_msg")"
+          # Generate commit message based on collection mode
+          if [ "$COLLECTION_MODE" = "full_sync" ]; then
+            commit_msg="Full sync: Update traffic statistics for last 14 days ($(date +"%Y-%m-%d %H:%M:%S %Z"))"
+          elif [ "$COLLECTION_MODE" = "manual" ]; then
+            commit_msg="Manual collection: Update traffic statistics for last $DAYS_TO_COLLECT days ($(date +"%Y-%m-%d %H:%M:%S %Z"))"
           else
-            git commit -m "Update clone and visitor statistics for $(date +"%Y-%m-%d %H:%M:%S %Z")"
+            commit_msg="Scheduled update: Traffic statistics for last $DAYS_TO_COLLECT days ($(date +"%Y-%m-%d %H:%M:%S %Z"))"
           fi
           
+          git commit -m "$commit_msg"
           git pull --rebase origin main
           git push origin main
           echo "Successfully pushed updated traffic data"
@@ -301,7 +367,7 @@ jobs:
         
         if [[ -n $(git status -s repo_traffic_data) ]]; then
           git add -f repo_traffic_data/
-          git commit -m "Update clone and visitor statistics for $(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z")"
+          git commit -m "Update traffic statistics ($(TZ=Europe/Bucharest date +"%Y-%m-%d %H:%M:%S %Z"))"
           git pull --rebase origin main
           git push origin main
         fi
