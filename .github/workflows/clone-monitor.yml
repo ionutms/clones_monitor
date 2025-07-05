@@ -38,6 +38,7 @@ env:
     clones_monitor=clones_monitor
     systemverilog_learning=SystemVerilog_Learning
     uvm_learning=uvm_learning
+    langgraph_learning=LangGraph_Learning
   # Default number of days to collect (can be overridden by workflow_dispatch)
   DEFAULT_DAYS_TO_COLLECT: '2'
 
