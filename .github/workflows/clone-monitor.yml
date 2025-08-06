@@ -40,6 +40,7 @@ env:
     uvm_learning=uvm_learning
     langgraph_learning=LangGraph_Learning
     model_context_protocol_learning=Model_Context_Protocol_Learning
+    pdf_rag_learning=PDF_RAG_Learning
   # Default number of days to collect (can be overridden by workflow_dispatch)
   DEFAULT_DAYS_TO_COLLECT: '2'
 
