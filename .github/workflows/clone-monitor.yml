@@ -32,6 +32,7 @@ env:
     minimal_max17761=Minimal_MAX17761
     minimal_lt8304=Minimal_LT8304
     minimal_ad74416h=Minimal_AD74416H
+    ad74416h_power_interface_module=AD74416H_Power_Interface_Module
     minimal_adp1031=Minimal_ADP1031
     minimal_max17570=Minimal_MAX17570
     3d_models_vault=3D_Models_Vault
