@@ -36,6 +36,7 @@ env:
     modular_ad74416h_plc=Modular_AD74416H_PLC
     minimal_adp1031=Minimal_ADP1031
     minimal_adp1074=Minimal_ADP1074
+    minimal_adpl76030=Minimal_ADPL76030
     minimal_max17570=Minimal_MAX17570
     3d_models_vault=3D_Models_Vault
     minimal_max32650=Minimal_MAX32650
