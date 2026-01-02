@@ -33,6 +33,7 @@ env:
     minimal_lt8304=Minimal_LT8304
     minimal_ltc3350=Minimal_LTC3350
     supercap_bank=Supercap_Bank
+    ltc3350_interactive_calculator=LTC3350_Interactive_Calculator
     minimal_ad74416h=Minimal_AD74416H
     minimal_ad74416h_stack_adapter=Minimal_AD74416H_Stack_Adapter
     ad74416h_power_interface_module=AD74416H_Power_Interface_Module
