@@ -32,7 +32,7 @@ env:
     minimal_max17761=Minimal_MAX17761
     minimal_lt8304=Minimal_LT8304
     minimal_ltc3350=Minimal_LTC3350
-    minimal_ltc4296-2=Minimal_LTC4296-1
+    minimal_ltc4296-1=Minimal_LTC4296-1
     supercap_bank=Supercap_Bank
     plc_spoe_ups=PLC_SPOE_UPS
     minimal_ad74416h=Minimal_AD74416H
