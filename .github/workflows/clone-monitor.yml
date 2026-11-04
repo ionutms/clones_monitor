@@ -49,6 +49,8 @@ env:
     docker_3d_models_hosting=Docker_3D_Models_Hosting
     clones_monitor=clones_monitor
     workflow_distributor=workflow_distributor
+    freecad-jumper-wire-pen=freecad-jumper-wire-pen
+    freecad-wire-harness=freecad-wire-harness
     systemverilog_learning=SystemVerilog_Learning
     uvm_learning=uvm_learning
     langgraph_learning=LangGraph_Learning
