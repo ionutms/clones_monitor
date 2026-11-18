@@ -51,6 +51,7 @@ env:
     workflow_distributor=workflow_distributor
     freecad-jumper-wire-pen=freecad-jumper-wire-pen
     freecad-wire-harness=freecad-wire-harness
+    freecad-scope-probe-arm=freecad-scope-probe-arm
     systemverilog_learning=SystemVerilog_Learning
     uvm_learning=uvm_learning
     langgraph_learning=LangGraph_Learning
